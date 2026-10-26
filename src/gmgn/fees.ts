@@ -22,7 +22,7 @@ export class GmgnFeeEnricher {
     this.nextPollAt = now + 5_000;
     const filters = this.store.getFilters();
     const pending = this.store.listCandidates(10_000).filter(({ candidate, state }) =>
-      state !== "settled" && state !== "reserved" && filters[candidate.launchpad]?.enabled &&
+      state !== "settled" && filters[candidate.launchpad]?.enabled &&
       !(candidate.launchpad === "pumpfun" && candidate.isMayhemMode === true) &&
       candidate.graduatedAt <= now && now - candidate.graduatedAt <= 30 * 60_000 &&
       (candidate.feeMetricsAt === undefined || now - candidate.feeMetricsAt >= 60_000) &&

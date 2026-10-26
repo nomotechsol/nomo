@@ -193,6 +193,31 @@ describe("local purchase cycle", () => {
     store.close();
   });
 
+  it("waits for fresh GMGN fees on a reserved job, then completes the buy", async () => {
+    const store = new Store(":memory:");
+    store.setFilters({ ...disabledFilters, pumpfun: { enabled: true, minTotalFeesNative: 1,
+      maxFeeMetricsAgeSeconds: 120 } });
+    const now = Date.now();
+    store.addCandidate({ chain: "sol", launchpad: "pumpfun", token: "refreshed", pool: "pool",
+      graduationTx: "sig", graduatedAt: now - 1_000, totalFeesNative: 2,
+      feeMetricsAt: now - 121_000, isMayhemMode: false, quoteMint: "quote" });
+    const id = store.listCandidates()[0]!.id;
+    store.updateCandidate(id, "eligible", []);
+    store.startJob(id);
+    store.advanceJob(id, "reserved", "snapshotted", { spendAtoms: "1000000000",
+      snapshotSlot: 123, holders: [{ solWallet: wallet(1), rawBalance: "1000000" }] });
+    const adapter = new LocalAdapter();
+    const engine = new ExecutionEngine(store, adapter, { activatedAt: now - 2_000 });
+    expect(await engine.tick(now)).toBeUndefined();
+    expect(store.getJob(id)?.stage).toBe("snapshotted");
+    expect(adapter.spends).toHaveLength(0);
+    store.enrichCandidate("sol", "refreshed", { feeMetricsAt: now });
+    await engine.tick(now + 1);
+    expect(store.getJob(id)?.stage).toBe("published");
+    expect(adapter.spends).toEqual([1_000_000_000n]);
+    store.close();
+  });
+
   it("processes only a fresh fee-qualified Pons V2 migration on RH", async () => {
     const store = new Store(":memory:");
     store.setFilters({ ...disabledFilters,

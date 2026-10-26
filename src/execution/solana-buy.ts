@@ -6,6 +6,7 @@ import { ComputeBudgetProgram, Connection, PublicKey, TransactionMessage,
   VersionedTransaction, type TransactionInstruction } from "@solana/web3.js";
 import type { Candidate } from "../domain.js";
 import { Store } from "../store.js";
+import { expiredSignatureAbsent } from "./solana-expiry.js";
 import { PumpPurchaseQuotes, RaydiumFundingQuotes, RaydiumRouteUnavailable,
   StonkPurchaseQuotes, type PumpNestedRoute } from "./solana-routes.js";
 
@@ -175,8 +176,15 @@ export class SolanaBuyExecutor {
     if (status?.err) throw new Error(`Purchase transaction failed: ${JSON.stringify(status.err)}`);
     if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized")
       return pending.signature;
-    if (await this.sendConnection.getBlockHeight("confirmed") > pending.lastValidBlockHeight)
-      throw new Error("Signed purchase transaction expired; reconcile its signature before retrying");
+    if (await this.sendConnection.getBlockHeight("confirmed") > pending.lastValidBlockHeight) {
+      if (await expiredSignatureAbsent(this.sendConnection, pending.signature,
+        pending.lastValidBlockHeight)) {
+        plan.pending = undefined;
+        this.savePlan(candidateId, plan);
+        throw new Error("Expired purchase transaction proved absent; retry or abort on next poll");
+      }
+      throw new Error("Signed purchase transaction expired; final reconciliation required");
+    }
     const transaction = VersionedTransaction.deserialize(Buffer.from(pending.transaction, "base64"));
     const simulation = await this.sendConnection.simulateTransaction(transaction,
       { sigVerify: true, commitment: "confirmed" });

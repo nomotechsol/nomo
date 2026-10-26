@@ -212,8 +212,9 @@ export class Store {
     const normalized = chain === "sol" ? token : token.toLowerCase();
     const row = this.db.prepare("SELECT id, candidate_json, state FROM candidates WHERE chain = ? AND token = ?")
       .get(chain, normalized) as { id: string; candidate_json: string; state: CandidateState } | undefined;
-    if (!row || row.state === "reserved" || row.state === "settled") return;
-    const allowed = ["marketCapUsd", "liquidityUsd", "holders", "volumeUsd1h", "top10Rate", "bundlerRate",
+    if (!row || row.state === "settled") return;
+    const allowed = row.state === "reserved" ? ["totalFeesNative", "totalFeesUsd", "feeMetricsAt"] as const :
+      ["marketCapUsd", "liquidityUsd", "holders", "volumeUsd1h", "top10Rate", "bundlerRate",
       "insiderRate", "isHoneypot", "isMayhemMode", "quoteMint", "quoteToken", "taxBps", "totalFeesNative", "totalFeesUsd", "feeMetricsAt"] as const;
     const update: Partial<Candidate> = {};
     for (const key of allowed) {

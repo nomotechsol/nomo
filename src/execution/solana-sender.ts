@@ -3,6 +3,7 @@ import nacl from "tweetnacl";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { Store } from "../store.js";
 import type { SolanaTransactionSigner } from "./solana-buy.js";
+import { expiredSignatureAbsent } from "./solana-expiry.js";
 
 type PendingOperation = { signed: string; signature: string; blockhash: string;
   lastValidBlockHeight: number; confirmed: number };
@@ -18,6 +19,11 @@ export class SolanaOperationSender {
   }
 
   async execute(operationId: string, build: () => Promise<VersionedTransaction>): Promise<string> {
+    return this.executeAttempt(operationId, build, true);
+  }
+
+  private async executeAttempt(operationId: string, build: () => Promise<VersionedTransaction>,
+    allowExpiredRetry: boolean): Promise<string> {
     if (!operationId) throw new Error("Solana operation ID is required");
     let row = this.store.db.prepare(`SELECT signed, signature, blockhash,
       last_valid_block_height AS lastValidBlockHeight, confirmed
@@ -46,8 +52,15 @@ export class SolanaOperationSender {
       { searchTransactionHistory: true })).value[0];
     if (status?.err) throw new Error(`Solana operation failed: ${JSON.stringify(status.err)}`);
     if (status?.confirmationStatus !== "confirmed" && status?.confirmationStatus !== "finalized") {
-      if (await this.connection.getBlockHeight("confirmed") > row.lastValidBlockHeight)
-        throw new Error("Signed Solana operation expired; reconcile before retrying");
+      if (await this.connection.getBlockHeight("confirmed") > row.lastValidBlockHeight) {
+        if (allowExpiredRetry && await expiredSignatureAbsent(this.connection, row.signature,
+          row.lastValidBlockHeight)) {
+          this.store.db.prepare(`DELETE FROM solana_signed_operations
+            WHERE operation_id = ? AND signature = ? AND confirmed = 0`).run(operationId, row.signature);
+          return this.executeAttempt(operationId, build, false);
+        }
+        throw new Error("Signed Solana operation expired; final reconciliation required");
+      }
       const transaction = VersionedTransaction.deserialize(Buffer.from(row.signed, "base64"));
       const simulation = await this.connection.simulateTransaction(transaction,
         { sigVerify: true, commitment: "confirmed" });

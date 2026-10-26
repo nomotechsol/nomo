@@ -142,11 +142,16 @@ export class ExecutionEngine {
         finalSignature?: unknown } | undefined;
       if (!buyPlan?.pending && !buyPlan?.finalSignature && (!buyPlan || buyPlan.fundingIndex === 0)) {
         const rule = this.store.getFilters()[candidate.launchpad];
-        const fresh = candidate.graduatedAt > this.executionStartAt[candidate.chain] &&
-          now - candidate.graduatedAt <= this.maxGraduationAgeMs &&
-          missingCandidateData(candidate, rule).length === 0 &&
-          evaluateCandidate(candidate, rule, now).length === 0;
+        const withinWindow = candidate.graduatedAt > this.executionStartAt[candidate.chain] &&
+          now - candidate.graduatedAt <= this.maxGraduationAgeMs;
+        const missing = missingCandidateData(candidate, rule);
+        const failures = evaluateCandidate(candidate, rule, now);
+        const fresh = withinWindow && missing.length === 0 && failures.length === 0;
         if (!fresh) {
+          // Fee metrics are refreshed asynchronously. Hold a reserved job briefly instead of
+          // permanently rejecting it while the purchase window is still open.
+          if (withinWindow && missing.length === 0 && failures.length > 0 &&
+              failures.every((reason) => reason === "fee_metrics_stale")) return undefined;
           this.store.abortJob(id, "expired_or_filtered_before_buy");
           return undefined;
         }
