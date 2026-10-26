@@ -24,6 +24,7 @@ import { ExecutionEngine } from "./execution/engine.js";
 import { SolanaExecutionAdapter } from "./execution/solana-adapter.js";
 import { BackendSolanaSigner } from "./execution/backend-solana-signer.js";
 import { SolanaAutoDistributor } from "./execution/solana-auto-distributor.js";
+import { SolanaRewardTopUp } from "./execution/solana-reward-topup.js";
 import { BackendEvmSigner } from "./execution/backend-evm-signer.js";
 import { BscExecutionAdapter } from "./execution/bsc-adapter.js";
 import { CreatorFeeCollector } from "./execution/creator-fee-collector.js";
@@ -117,6 +118,23 @@ const solanaClaims = solanaConnection && rewardSigner ? new BackendSolanaClaims(
     process.env.SOLANA_CLUSTER === "localnet" ? "localnet" : "mainnet") : undefined;
 const solanaDistributor = liveSolana && solanaConnection && rewardSigner
   ? new SolanaAutoDistributor(store, solanaConnection, rewardSigner) : undefined;
+function topUpLamports(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  if (!/^(0|[1-9]\d*)$/.test(raw) || !Number.isSafeInteger(Number(raw)))
+    throw new Error(`${name} must be a nonnegative integer number of lamports`);
+  return Number(raw);
+}
+const topUpEnabled = process.env.SOLANA_REWARD_TOPUP_ENABLED === "true";
+if (topUpEnabled && (!liveSolana || process.env.SOLANA_CLUSTER !== "mainnet" ||
+    !solanaConnection || !treasurySigner || !rewardSigner))
+  throw new Error("Solana reward top-up requires live mainnet and both backend signers");
+const rewardTopUp = topUpEnabled ? new SolanaRewardTopUp(store, solanaConnection!,
+  treasurySigner!, rewardSigner!, {
+    thresholdLamports: topUpLamports("SOLANA_REWARD_TOPUP_THRESHOLD_LAMPORTS", 100_000_000),
+    amountLamports: topUpLamports("SOLANA_REWARD_TOPUP_AMOUNT_LAMPORTS", 300_000_000),
+    treasuryReserveLamports: topUpLamports("SOLANA_REWARD_TOPUP_TREASURY_RESERVE_LAMPORTS", 4_000_000_000),
+  }) : undefined;
 const bscClaims = liveBsc ? new BackendBscClaims(store, process.env.BSC_RPC_URL!,
   bscRewardSigner!) : undefined;
 const rhClaims = liveRh ? new BackendBscClaims(store, process.env.RH_RPC_URL!,
@@ -129,6 +147,7 @@ let polling = false;
 let lastPollAt: number | null = null;
 let lastPollError: string | null = null;
 let lastPayoutError: string | null = null;
+let lastTopUpError: string | null = null;
 let lastFeeCollectionError: string | null = null;
 let lastSolPollAt = 0;
 
@@ -240,6 +259,7 @@ const executionMode = () => !liveSolana ? "read_only" :
 app.get("/health", async () => ({ ok: true, mode: executionMode(), evmScanners: scanners.length,
   solanaScanner: Boolean(solana), solanaClaims: Boolean(solanaClaims),
   solanaAutoDelivery: Boolean(solanaDistributor), lastPayoutError, lastFeeCollectionError,
+  solanaRewardAutoTopUp: Boolean(rewardTopUp), lastTopUpError,
   bscClaims: Boolean(bscClaims), rhClaims: Boolean(rhClaims), gmgnRhDiscovery: Boolean(gmgnRh),
   lastPollAt, lastPollError }));
 app.get("/api/candidates", async () => ({ items: store.listCandidates(), filters: store.getFilters(),
@@ -438,6 +458,7 @@ if (existsSync(webRoot)) void app.register(staticPlugin, { root: webRoot, prefix
 
 let timer: ReturnType<typeof setInterval> | undefined;
 let payoutTimer: ReturnType<typeof setInterval> | undefined;
+let topUpTimer: ReturnType<typeof setInterval> | undefined;
 function startBackgroundWork(): void {
   timer = setInterval(() => { void poll(); }, 5_000);
   timer.unref();
@@ -449,11 +470,24 @@ function startBackgroundWork(): void {
       });
   }, 2_000);
   payoutTimer.unref();
+  if (rewardTopUp) {
+    const runTopUp = () => { void rewardTopUp.tick().then((signature) => {
+      lastTopUpError = null;
+      if (signature) app.log.info({ signature }, "Solana reward wallet automatically funded");
+    }).catch((error: unknown) => {
+      lastTopUpError = error instanceof Error ? error.message : String(error);
+      app.log.error({ err: error }, "Solana reward wallet top-up failed");
+    }); };
+    topUpTimer = setInterval(runTopUp, 10_000);
+    topUpTimer.unref();
+    runTopUp();
+  }
   void poll();
 }
 app.addHook("onClose", async () => {
   if (timer) clearInterval(timer);
   if (payoutTimer) clearInterval(payoutTimer);
+  if (topUpTimer) clearInterval(topUpTimer);
   await solana?.stop(); store.close(); });
 
 try {

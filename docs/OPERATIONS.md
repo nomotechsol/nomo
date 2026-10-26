@@ -25,6 +25,8 @@ The backend takes a finalized NOMO holder snapshot at purchase time. A wallet ne
 
 New Solana rewards are sent automatically from the reward wallet. Up to four recipients are grouped into a transaction, with token-account creation where necessary. The reward wallet pays SOL network fees and account rent. BNB and RH holders link an EVM address by signing with both wallets. A claim reimburses the estimated native gas, then the backend sends the ERC-20 reward. Payment and payout are separate transactions; the journal keeps an incomplete claim for retry and prevents a second payout.
 
+Optional Solana reward-wallet auto-funding uses the treasury signer to transfer 0.3 SOL when the reward wallet drops below 0.1 SOL. It is disabled by default. The transfer goes only to the configured Solana reward signer, is simulated before submission, and is journalled before broadcast. There is no daily transfer cap. A 4 SOL treasury reserve stops further transfers, and a one-minute cooldown lets the confirmed balance propagate before another transfer. The threshold and amount can be adjusted in the environment within code-enforced bounds. An ambiguous or expired signed transfer requires reconciliation rather than an automatic replacement. `/health` reports `solanaRewardAutoTopUp` and `lastTopUpError`. Enable `SOLANA_REWARD_TOPUP_ENABLED=true` only after reviewing the live wallet addresses and limits.
+
 The same two EVM key files may be used on **both** BNB and RH: one treasury key and one reward key. Their public addresses are identical across these EVM networks, while balances and gas currencies remain chain-specific. They must be distinct from each other in the current custody model.
 
 ## Run locally
