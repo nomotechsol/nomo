@@ -25,7 +25,8 @@ type Chain = Activity["chain"];
 type SpotQuote = { usd: number; source: "binance" | "coingecko"; fetchedAt: number };
 type StatsSummary = { count: number; solBudgetLamports: string | null; totalUsd: number | null;
   chains: Record<Chain, { count: number; nativeUnit: "SOL" | "BNB" | "ETH"; spendAtoms: string | null;
-    usd: number | null; price: SpotQuote | null }> };
+    usd: number | null; price: SpotQuote | null }>;
+  rewardWallets?: Record<Chain, string | null> };
 type Purchase = { candidateId: string; chain: Chain; launchpad: string; token: string;
   name: string | null; symbol: string | null; imageUrl: string | null; purchaseTx: string;
   spendAtoms: string | null; budgetLamports: string | null; createdAt: number };
@@ -280,7 +281,22 @@ function renderStatsSummary(): void {
     const row = summary.chains[chain];
     byId(`stats-${prefix}-native`).textContent = `${nativeLabel(row.spendAtoms, chain)} ${row.nativeUnit}`;
     byId(`stats-${prefix}-usd`).textContent = `${row.usd === null ? "USD unavailable" : `≈ ${usdLabel(row.usd)}`} · ${row.count} ${row.count === 1 ? "buy" : "buys"}`;
+    const wallet = summary.rewardWallets?.[chain] ?? null;
+    const button = byId<HTMLButtonElement>(`stats-${prefix}-wallet`);
+    button.disabled = !wallet;
+    button.textContent = wallet ? `${short(wallet)}  ⧉` : "—";
+    button.title = wallet ? `Copy reward wallet: ${wallet}` : "Reward wallet unavailable";
+    button.setAttribute("aria-label", wallet ? `Copy ${chain === "sol" ? "Solana" : chain === "bsc" ? "BNB Chain" : "Robinhood Chain"} reward wallet ${wallet}` : "Reward wallet unavailable");
   }
+}
+
+for (const [chain, prefix] of [["sol", "sol"], ["bsc", "bsc"], ["robinhood", "rh"]] as const) {
+  byId<HTMLButtonElement>(`stats-${prefix}-wallet`).addEventListener("click", () => {
+    const wallet = statsSummary?.rewardWallets?.[chain];
+    if (!wallet) return;
+    void navigator.clipboard.writeText(wallet).then(() => toast("Reward wallet copied", false, 2600))
+      .catch(() => toast("Could not copy wallet", true));
+  });
 }
 
 async function loadStatsSummary(): Promise<void> {

@@ -334,6 +334,12 @@ body { overflow-x: hidden; }
 .stats-chain-card:last-child { border-right: 0; }
 .stats-chain-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px; font-size: 20px; font-weight: 500; }
 .stats-chain-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; color: #777; font-size: 12px; }
+.stats-wallet { min-width: 0; margin-top: 15px; }
+.stats-wallet span { display: block; color: var(--muted); font-size: 11px; }
+.stats-wallet button { display: block; max-width: 100%; padding: 3px 0 0; overflow: hidden; border: 0; background: transparent; color: #000; font: inherit; font-size: 12px; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: copy; }
+.stats-wallet button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.stats-wallet button:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; }
+.stats-wallet button:disabled { color: var(--muted); cursor: default; }
 .stats-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-top: 30px; padding-bottom: 11px; border-bottom: 1px solid var(--line); }
 .stats-list-heading h3 { font-size: 25px; font-weight: 400; letter-spacing: -.035em; }
 .stats-list-heading span { color: var(--muted); font-size: 12px; }
@@ -456,6 +462,9 @@ body { overflow-x: hidden; }
   .stats-chain-card > span { font-size: 9px; }
   .stats-chain-card strong { font-size: 14px; }
   .stats-chain-card small { font-size: 9px; }
+  .stats-wallet { margin-top: 9px; }
+  .stats-wallet span { font-size: 9px; }
+  .stats-wallet button { font-size: 10px; }
   .stats-list-heading { margin-top: 19px; }
   .stats-tabs { gap: 13px; }
   .stats-tabs button { font-size: 17px; }

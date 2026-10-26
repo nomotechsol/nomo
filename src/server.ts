@@ -99,15 +99,17 @@ const rewardSigner = process.env.SOLANA_REWARD_KEYPAIR_PATH
 const solanaAdapter = liveSolana ? new SolanaExecutionAdapter(store, process.env.HELIUS_RPC_URL!,
     solanaConnection!, treasurySigner!, rewardSigner!, process.env.MAIN_TOKEN_MINT!,
     process.env.MAIN_TOKEN_LP_POOL!) : undefined;
+const bscRewardSigner = liveBsc ? BackendEvmSigner.fromFile(process.env.BSC_REWARD_KEY_PATH!) : undefined;
+const rhRewardSigner = liveRh ? BackendEvmSigner.fromFile(process.env.RH_REWARD_KEY_PATH!) : undefined;
 const bscAdapter = liveBsc && solanaAdapter && solanaConnection && treasurySigner
   ? new BscExecutionAdapter(store, solanaAdapter, solanaConnection, treasurySigner,
     process.env.BSC_RPC_URL!, BackendEvmSigner.fromFile(process.env.BSC_TREASURY_KEY_PATH!),
-    BackendEvmSigner.fromFile(process.env.BSC_REWARD_KEY_PATH!),
+    bscRewardSigner!,
     process.env.BSC_GAS_RESERVE_WEI ? BigInt(process.env.BSC_GAS_RESERVE_WEI) : undefined) : undefined;
 const rhAdapter = liveRh && solanaAdapter && solanaConnection && treasurySigner
   ? new BscExecutionAdapter(store, solanaAdapter, solanaConnection, treasurySigner,
     process.env.RH_RPC_URL!, BackendEvmSigner.fromFile(process.env.RH_TREASURY_KEY_PATH!),
-    BackendEvmSigner.fromFile(process.env.RH_REWARD_KEY_PATH!),
+    rhRewardSigner!,
     process.env.RH_GAS_RESERVE_WEI ? BigInt(process.env.RH_GAS_RESERVE_WEI) : undefined,
     "robinhood") : undefined;
 const solanaClaims = solanaConnection && rewardSigner ? new BackendSolanaClaims(store, solanaConnection,
@@ -116,9 +118,9 @@ const solanaClaims = solanaConnection && rewardSigner ? new BackendSolanaClaims(
 const solanaDistributor = liveSolana && solanaConnection && rewardSigner
   ? new SolanaAutoDistributor(store, solanaConnection, rewardSigner) : undefined;
 const bscClaims = liveBsc ? new BackendBscClaims(store, process.env.BSC_RPC_URL!,
-  BackendEvmSigner.fromFile(process.env.BSC_REWARD_KEY_PATH!)) : undefined;
+  bscRewardSigner!) : undefined;
 const rhClaims = liveRh ? new BackendBscClaims(store, process.env.RH_RPC_URL!,
-  BackendEvmSigner.fromFile(process.env.RH_REWARD_KEY_PATH!), "robinhood") : undefined;
+  rhRewardSigner!, "robinhood") : undefined;
 const feeCollector = solanaAdapter ? new CreatorFeeCollector(store, solanaAdapter) : undefined;
 let execution: ExecutionEngine | undefined;
 
@@ -254,7 +256,10 @@ app.get("/api/stats", async (_request, reply) => {
   reply.header("cache-control", "no-store");
   const totals = store.purchaseTotals();
   const emptyQuotes: SpotQuotes = { sol: null, bsc: null, robinhood: null };
-  return buildStatsSummary(totals, totals.count > 0 ? await cachedSpotQuotes() : emptyQuotes);
+  return { ...buildStatsSummary(totals, totals.count > 0 ? await cachedSpotQuotes() : emptyQuotes),
+    rewardWallets: { sol: rewardSigner?.publicKey.toBase58() ?? null,
+      bsc: bscRewardSigner?.account.address ?? null,
+      robinhood: rhRewardSigner?.account.address ?? null } };
 });
 app.get<{ Querystring: { cursor?: string } }>("/api/stats/purchases", async (request, reply) => {
   reply.header("cache-control", "no-store");
