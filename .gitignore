@@ -1,0 +1,17 @@
+node_modules/
+web-dist/
+data/
+.env
+*.keypair.json
+*.pem
+.surfpool/
+reports/
+design-preview*
+design-reference/
+premium-audit.json
+docs/english-site-preview.jpg
+.DS_Store
+*.log
+*.db
+*.db-shm
+*.db-wal

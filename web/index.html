@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>NOMO — Chill with NOMO</title>
+    <meta name="description" content="NOMO follows newly graduated tokens across Solana, BNB and Robinhood Chain while you get on with your day." />
+  </head>
+  <body>
+    <div id="app">
+      <header class="site-header shell">
+        <nav class="header-inner" aria-label="Main navigation">
+          <a class="brand" href="#top" aria-label="NOMO home"><img class="brand-logo" src="/nomo-logo.svg" alt="" width="924" height="196" /></a>
+          <div class="header-right"><button class="header-link thesis-trigger" id="open-thesis" type="button">Thesis</button><button class="header-link stats-trigger" id="open-stats" type="button">Stats</button><button class="header-link rewards-trigger" id="open-rewards" type="button">My rewards <span aria-hidden="true">↗</span></button><span id="system-status" class="status-pill">Checking feeds</span></div>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="hero shell" aria-labelledby="hero-title">
+          <div class="hero-heading">
+            <h1 id="hero-title">Chill with<br /><span class="hero-name">NOMO<svg class="hero-underline" viewBox="0 0 520 36" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="nomo-stroke" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f292b4"/><stop offset=".5" stop-color="#f1b36f"/><stop offset="1" stop-color="#6bbdaf"/></linearGradient></defs><path d="M12 23 C96 12 164 26 259 15 S418 5 507 15" fill="none" stroke="url(#nomo-stroke)" stroke-width="10" stroke-linecap="round"/></svg></span></h1>
+          </div>
+
+          <div class="hero-stage">
+            <div class="phone-scene" aria-label="A phone scrolling a social feed">
+              <div class="phone-art">
+                <img src="/images/refero-phone-only.png" alt="Pink phone with a social feed of placeholder posts" />
+                <div class="phone-feed" aria-hidden="true">
+                  <div class="phone-feed-track">
+                    <div class="phone-post"><div class="phone-post-head"><i></i><span><b></b><b></b></span></div><em></em><em></em><div class="phone-post-photo"></div><div class="phone-post-actions">♡　↻　♡　▥</div></div>
+                    <div class="phone-post"><div class="phone-post-head"><i></i><span><b></b><b></b></span></div><em></em><div class="phone-post-photo short"></div><div class="phone-post-actions">♡　↻　♡　▥</div></div>
+                    <div class="phone-post"><div class="phone-post-head"><i></i><span><b></b><b></b></span></div><em></em><em></em><div class="phone-post-photo"></div><div class="phone-post-actions">♡　↻　♡　▥</div></div>
+                    <div class="phone-post"><div class="phone-post-head"><i></i><span><b></b><b></b></span></div><em></em><em></em><div class="phone-post-photo"></div><div class="phone-post-actions">♡　↻　♡　▥</div></div>
+                    <div class="phone-post"><div class="phone-post-head"><i></i><span><b></b><b></b></span></div><em></em><div class="phone-post-photo short"></div><div class="phone-post-actions">♡　↻　♡　▥</div></div>
+                    <div class="phone-post"><div class="phone-post-head"><i></i><span><b></b><b></b></span></div><em></em><em></em><div class="phone-post-photo"></div><div class="phone-post-actions">♡　↻　♡　▥</div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside id="activity" class="activity-panel" aria-label="Graduated token and purchase activity">
+              <div class="activity-heading"><h2>On the move.</h2></div>
+              <p class="activity-intro">Fresh graduates and confirmed NOMO buys appear here.</p>
+              <div class="hero-stats" aria-label="Confirmed purchase statistics"><div><strong id="hero-stats-count">0</strong><span>Tokens bought</span></div><div><strong id="hero-stats-sol">0 SOL</strong><span>SOL allocated</span></div><div><strong id="hero-stats-usd">$0</strong><span>Est. USD</span></div></div>
+              <div class="activity-toolbar"><div class="chain-filters" role="group" aria-label="Filter activity by chain"><button type="button" class="active" data-chain="all" aria-pressed="true">All</button><button type="button" data-chain="sol" aria-pressed="false">SOL</button><button type="button" data-chain="bsc" aria-pressed="false">BNB</button><button type="button" data-chain="robinhood" aria-pressed="false">RH</button></div><span id="activity-count">0 events</span></div>
+              <div id="activity-body" class="activity-body" aria-live="polite"><div class="activity-empty"><span class="empty-orbit">✳</span><strong>Waiting for the next graduation</strong><p>Confirmed tokens and NOMO purchases will show up here.</p></div></div>
+              <div class="activity-footer"><span class="pulse-dot"></span><span id="activity-updated">Checking for new events</span></div>
+            </aside>
+          </div>
+        </section>
+      </main>
+      <dialog id="thesis-modal" class="thesis-modal" aria-labelledby="thesis-title">
+        <button id="close-thesis" class="modal-close" type="button" aria-label="Close thesis">×</button>
+        <div class="thesis-head"><span class="eyebrow">THE IDEA</span><h2 id="thesis-title">Keep scrolling.<br /><span>NOMO keeps moving.</span></h2><p>NOMO is designed to turn fees from its own token into buys of selected newly graduated meme coins. Hold NOMO, and your share of those buys is set at the moment they happen.</p></div>
+        <div class="thesis-numbers" aria-label="How a buy is split"><div><strong>25%</strong><span>of the current treasury for each eligible buy</span></div><div><strong>70%</strong><span>of bought tokens reserved for holders</span></div><div><strong>30%</strong><span>of bought tokens retained by the project</span></div></div>
+        <div class="thesis-flow" aria-label="How NOMO works">
+          <div><span class="thesis-step">01 / FIND</span><h3>Newly graduated.</h3><p>NOMO watches Pump.fun, StonkFun, Flap, Four.meme and Pons V2 across Solana, BNB and Robinhood Chain.</p></div>
+          <div><span class="thesis-step">02 / FILTER</span><h3>Skip the noise.</h3><p>A token must pass the selected filters, including GMGN Total Fees. No confirmed fee data means no buy.</p></div>
+          <div><span class="thesis-step">03 / BUY</span><h3>Treasury to token.</h3><p>After a qualifying graduation, the system is designed to use 25% of its current treasury, converting PUMP to SOL and bridging for EVM buys when needed.</p></div>
+          <div><span class="thesis-step">04 / REWARD</span><h3>Your share is fixed.</h3><p>At the buy, a snapshot counts NOMO wallets holding at least 1,000,000 tokens and excludes the liquidity pool. Solana rewards go straight to those wallets. BNB and RH rewards require a linked EVM wallet and a claim.</p></div>
+        </div>
+        <div class="thesis-end"><strong>Why hold?</strong><div><p>The appeal is simple: a share of selected buys can accrue while you do something else. The feed shows what graduated, what passed, and what NOMO actually bought.</p><a class="thesis-social" href="https://x.com/nomotechsol?s=11" target="_blank" rel="noopener noreferrer">Follow NOMO on X <span aria-hidden="true">↗</span></a></div></div>
+        <p class="thesis-status">NOMO is currently a read-only preview. Automated live buys and funded claims are not active yet.</p>
+      </dialog>
+      <dialog id="stats-modal" class="stats-modal" aria-label="NOMO purchase statistics">
+        <button id="close-stats" class="modal-close" type="button" aria-label="Close statistics">×</button>
+        <div class="stats-modal-heading"><span class="eyebrow">NOMO ACTIVITY</span><h2>Stats.</h2><p>Confirmed buys across Solana, BNB and Robinhood Chain.</p></div>
+        <div class="stats-overview"><div><span>Tokens bought</span><strong id="stats-total-count">0</strong></div><div><span>SOL allocated</span><strong id="stats-total-sol">0 SOL</strong></div><div><span>Current USD estimate</span><strong id="stats-total-usd">$0</strong></div></div>
+        <div class="stats-chain-grid" aria-label="Purchases by chain">
+          <div class="stats-chain-card"><span>SOLANA</span><strong id="stats-sol-native">0 SOL</strong><small id="stats-sol-usd">≈ $0 · 0 buys</small></div>
+          <div class="stats-chain-card"><span>BNB CHAIN</span><strong id="stats-bsc-native">0 BNB</strong><small id="stats-bsc-usd">≈ $0 · 0 buys</small></div>
+          <div class="stats-chain-card"><span>ROBINHOOD</span><strong id="stats-rh-native">0 ETH</strong><small id="stats-rh-usd">≈ $0 · 0 buys</small></div>
+        </div>
+        <div class="stats-list-heading"><h3>Bought tokens</h3><span id="stats-list-count">0 buys</span></div>
+        <div id="stats-scroll" class="stats-scroll" tabindex="0" aria-label="Bought tokens list">
+          <div id="stats-list" class="stats-list"><div class="stats-empty">No confirmed buys yet.</div></div>
+          <div id="stats-load-state" class="stats-load-state" role="status" aria-live="polite"></div>
+          <div id="stats-sentinel" class="stats-sentinel" aria-hidden="true"></div>
+        </div>
+        <p class="stats-note">USD values use current spot prices, so they are estimates rather than historical trade prices. Binance is the primary quote source; CoinGecko is the fallback.</p>
+      </dialog>
+      <dialog id="rewards-modal" class="rewards-modal" aria-label="Your rewards and wallets">
+        <button id="close-rewards" class="modal-close" type="button" aria-label="Close rewards">×</button>
+        <section id="rewards" class="rewards-section" aria-label="Your rewards and wallets">
+          <div class="rewards-title"><div><div class="eyebrow">YOUR SIDE OF THE STORY</div><h2>Your rewards.</h2><p>Hold 1,000,000+ NOMO at a buy snapshot to qualify. Your share of the 70% holder pool is fixed then. Solana rewards arrive automatically; claim BNB and RH rewards below.</p></div></div>
+          <div class="rewards-flow" aria-label="Wallet setup">
+            <div class="rewards-flow-copy" aria-live="polite"><span id="wallet-step" class="eyebrow">YOUR WALLET</span><h3 id="wallet-step-title">See what’s yours.</h3><p id="wallet-step-description">Connect the Solana wallet that held NOMO at the snapshot.</p></div>
+            <button id="wallet-next" class="wallet-next" type="button">Choose Solana wallet</button>
+            <div id="sol-wallet-picker" class="wallet-picker" hidden><div class="wallet-picker-heading"><strong>Choose Solana wallet</strong><button id="cancel-sol-wallet" type="button" aria-label="Close wallet choices">×</button></div><div id="sol-wallet-list" class="wallet-picker-list" role="group" aria-label="Available Solana wallets"></div></div>
+            <div id="wallet-progress" class="wallet-progress" aria-label="Connected wallets" hidden><div class="wallet-connection"><span>Solana <b id="sol-status">Not connected</b></span><button id="change-sol" type="button" aria-label="Change Solana wallet">Change</button></div><div id="evm-progress" class="wallet-connection" hidden><span>EVM <b id="evm-status">Not connected</b></span><span id="link-state" class="wallet-link-state"></span><button id="change-evm" type="button" aria-label="Change EVM wallet">Change</button></div></div>
+          </div>
+          <div class="rewards-list-head"><h3>Allocations</h3><span id="round-count" class="count-tag">0 rounds</span></div>
+          <div class="rewards-panel"><div id="rewards-table-head" class="table-head" hidden><span>TOKEN / LAUNCHPAD</span><span>YOUR SHARE</span><span>STATUS</span></div><div id="rewards-body" class="rewards-body"><div class="empty-state"><strong>Connect your Solana wallet</strong><p>Your allocations will appear here after you connect.</p></div></div></div>
+          <p class="rewards-footnote">A snapshot fixes each allocation at purchase. For a BNB or RH claim, you’ll sign once with Solana and EVM to link the recipient, then approve its network fee in your EVM wallet.</p>
+        </section>
+      </dialog>
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

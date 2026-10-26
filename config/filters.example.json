@@ -1,0 +1,8 @@
+{
+  "pumpfun": { "enabled": true, "minTotalFeesNative": 1, "maxFeeMetricsAgeSeconds": 120 },
+  "stonkfun": { "enabled": true, "minTotalFeesNative": 1, "maxFeeMetricsAgeSeconds": 120 },
+  "fourmeme": { "enabled": true, "minTotalFeesNative": 0.15, "maxFeeMetricsAgeSeconds": 120 },
+  "flap_tax": { "enabled": true, "minTotalFeesNative": 0.15, "maxFeeMetricsAgeSeconds": 120 },
+  "flap_nontax": { "enabled": true, "minTotalFeesNative": 0.15, "maxFeeMetricsAgeSeconds": 120 },
+  "pons_v2": { "enabled": true, "minTotalFeesNative": 0.042934, "maxFeeMetricsAgeSeconds": 120 }
+}
