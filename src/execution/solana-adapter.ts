@@ -28,11 +28,16 @@ export class SolanaExecutionAdapter implements ExecutionAdapter {
   private readonly raydium: RaydiumFundingQuotes;
   private readonly sdk: InstanceType<typeof OnlinePumpSdk>;
   private readonly mainMint: PublicKey;
+  private readonly expectedLpPool: PublicKey | undefined;
 
   constructor(private readonly store: Store, private readonly rpcUrl: string,
     private readonly connection: Connection, private readonly signer: SolanaTransactionSigner,
-    private readonly rewardSigner: SolanaTransactionSigner, mainMint: string) {
+    private readonly rewardSigner: SolanaTransactionSigner, mainMint: string,
+    expectedLpPool?: string) {
     this.mainMint = new PublicKey(mainMint);
+    this.expectedLpPool = expectedLpPool ? new PublicKey(expectedLpPool) : undefined;
+    if (this.expectedLpPool && !this.expectedLpPool.equals(this.mainPool()))
+      throw new Error("Configured NOMO LP pool is not the canonical NOMO/PUMP PumpSwap pool");
     if (signer.publicKey.equals(rewardSigner.publicKey))
       throw new Error("Treasury and reward wallets must be separate");
     this.sender = new SolanaOperationSender(store, connection, signer);
@@ -113,7 +118,8 @@ export class SolanaExecutionAdapter implements ExecutionAdapter {
   }
 
   async snapshot(): Promise<SnapshotReceipt> {
-    const result = await finalizedHolderSnapshot({ rpcUrl: this.rpcUrl, mainMint: this.mainMint.toBase58() });
+    const result = await finalizedHolderSnapshot({ rpcUrl: this.rpcUrl, mainMint: this.mainMint.toBase58(),
+      extraExcludedAccounts: this.expectedLpPool ? [this.expectedLpPool.toBase58()] : [] });
     return { slot: result.slot, holders: result.holders };
   }
 

@@ -29,7 +29,7 @@ BNB and RH use the **same EVM execution and claim classes** with different chain
 
 ## Operational limits
 
-- `LIVE_TRADING=true` requires a deployed NOMO mint, a bonding curve quoted in PUMP, a treasury signer matching the on-chain creator and a Solana reward signer with at least 0.01 SOL. It does not require NOMO to graduate. If the canonical PumpSwap pool exists, its mint, quote and creator must also match. `LIVE_BSC_TRADING` and `LIVE_RH_TRADING` each require their RPC and EVM key paths in addition to Solana live mode.
+- `LIVE_TRADING=true` requires a deployed NOMO mint, the supplied `MAIN_TOKEN_LP_POOL` address matching the canonical NOMO/PUMP PumpSwap PDA, a bonding curve quoted in PUMP, a treasury signer matching the on-chain creator and a Solana reward signer with at least 0.01 SOL. It does not require NOMO to graduate. If the pool exists, its mint, quote and creator must also match. `LIVE_BSC_TRADING` and `LIVE_RH_TRADING` each require their RPC and EVM key paths in addition to Solana live mode.
 - The finalized holder snapshot uses Solana `getProgramAccounts` at one bank view. The Helius plan must support the real NOMO holder set. If it does not, a slot-consistent indexed snapshot is needed.
 - Helius WebSocket alone cannot guarantee discovery during outages. GMGN and launchpad APIs provide bounded recent-history fallback, but high-volume periods can exceed their result limits. Guaranteed coverage would require a cursor-based indexed event stream.
 - Pump.fun candidates require an on-chain PumpSwap pool and Mayhem flag check. StonkFun's GMGN pool address is the destination CPMM pool; the original LaunchLab pool comes from StonkFun data and is verified by the migration transaction.

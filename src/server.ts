@@ -33,8 +33,9 @@ const liveSolana = process.env.LIVE_TRADING === "true";
 const liveBsc = process.env.LIVE_BSC_TRADING === "true";
 const liveRh = process.env.LIVE_RH_TRADING === "true";
 if (liveSolana && (!process.env.HELIUS_RPC_URL || !process.env.MAIN_TOKEN_MINT ||
-    !process.env.SOLANA_TREASURY_KEYPAIR_PATH || !process.env.SOLANA_REWARD_KEYPAIR_PATH))
-  throw new Error("Live Solana execution requires RPC, NOMO mint and private backend keypair paths");
+    !process.env.MAIN_TOKEN_LP_POOL || !process.env.SOLANA_TREASURY_KEYPAIR_PATH ||
+    !process.env.SOLANA_REWARD_KEYPAIR_PATH))
+  throw new Error("Live Solana execution requires RPC, NOMO mint, canonical NOMO/PUMP LP pool and private backend keypair paths");
 if (liveBsc && (!liveSolana || !process.env.BSC_RPC_URL || !process.env.BSC_TREASURY_KEY_PATH ||
     !process.env.BSC_REWARD_KEY_PATH))
   throw new Error("Live BNB execution requires Solana live mode, BNB RPC and private EVM key files");
@@ -96,7 +97,8 @@ const treasurySigner = liveSolana ? BackendSolanaSigner.fromFile(process.env.SOL
 const rewardSigner = process.env.SOLANA_REWARD_KEYPAIR_PATH
   ? BackendSolanaSigner.fromFile(process.env.SOLANA_REWARD_KEYPAIR_PATH) : undefined;
 const solanaAdapter = liveSolana ? new SolanaExecutionAdapter(store, process.env.HELIUS_RPC_URL!,
-    solanaConnection!, treasurySigner!, rewardSigner!, process.env.MAIN_TOKEN_MINT!) : undefined;
+    solanaConnection!, treasurySigner!, rewardSigner!, process.env.MAIN_TOKEN_MINT!,
+    process.env.MAIN_TOKEN_LP_POOL!) : undefined;
 const bscAdapter = liveBsc && solanaAdapter && solanaConnection && treasurySigner
   ? new BscExecutionAdapter(store, solanaAdapter, solanaConnection, treasurySigner,
     process.env.BSC_RPC_URL!, BackendEvmSigner.fromFile(process.env.BSC_TREASURY_KEY_PATH!),

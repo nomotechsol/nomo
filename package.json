@@ -10,7 +10,8 @@
     "start": "tsx src/server.ts",
     "web:dev": "vite --config vite.config.ts",
     "web:build": "vite build --config vite.config.ts",
-    "web:check": "tsc -p tsconfig.web.json --noEmit"
+    "web:check": "tsc -p tsconfig.web.json --noEmit",
+    "live:preflight": "tsx tools/live-preflight.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",

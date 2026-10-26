@@ -91,3 +91,7 @@ The project has unit and local integration tests for candidate filtering, sequen
 Backend signing keys belong in private files outside the repository, referenced by paths in `.env`. Never commit a seed phrase, keypair, API token, `.env` file or production database.
 
 See the [architecture](docs/ARCHITECTURE.md) for execution details and the [operations guide](docs/OPERATIONS.md) for setup and local smoke tests.
+
+Before activating live execution, set `MAIN_TOKEN_MINT` and the canonical NOMO/PUMP
+`MAIN_TOKEN_LP_POOL`, then run `npm run live:preflight` on the deployment host.
+The preflight reads chain state and route quotes without signing or sending transactions.

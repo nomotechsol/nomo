@@ -10,9 +10,28 @@ const PUMP = new PublicKey("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn");
 const require = createRequire(import.meta.url);
 const { PUMP_AMM_PROGRAM_ID, PUMP_AMM_SDK } = require("@pump-fun/pump-swap-sdk") as
   typeof import("@pump-fun/pump-swap-sdk");
-const { PUMP_SDK } = require("@pump-fun/pump-sdk") as typeof import("@pump-fun/pump-sdk");
+const { PUMP_SDK, canonicalPumpPoolPdaWithQuote } = require("@pump-fun/pump-sdk") as
+  typeof import("@pump-fun/pump-sdk");
 
 describe("NOMO creator fees before migration", () => {
+  it("accepts only the canonical NOMO/PUMP LP pool supplied for live activation", () => {
+    const store = new Store(":memory:");
+    const mint = Keypair.generate().publicKey;
+    const treasury = Keypair.generate();
+    const reward = Keypair.generate();
+    const connection = {} as Connection;
+    const signer = { publicKey: treasury.publicKey, sign: vi.fn() };
+    const rewardSigner = { publicKey: reward.publicKey, sign: vi.fn() };
+    try {
+      expect(() => new SolanaExecutionAdapter(store, "http://127.0.0.1:8899", connection,
+        signer, rewardSigner, mint.toBase58(),
+        canonicalPumpPoolPdaWithQuote(mint, PUMP).toBase58())).not.toThrow();
+      expect(() => new SolanaExecutionAdapter(store, "http://127.0.0.1:8899", connection,
+        signer, rewardSigner, mint.toBase58(), Keypair.generate().publicKey.toBase58()))
+        .toThrow(/canonical NOMO\/PUMP/);
+    } finally { store.close(); }
+  });
+
   it("accepts a live PUMP-quoted curve without a PumpSwap pool and performs no empty sweep", async () => {
     const store = new Store(":memory:");
     const mint = Keypair.generate().publicKey;
