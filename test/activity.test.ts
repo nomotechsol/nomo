@@ -45,11 +45,15 @@ describe("public activity qualification", () => {
     expect(readyForActivity(newGraduate, filters, metadata, now, startAt)).toBe(true);
   });
 
-  it("keeps a previously qualified token in feed history after metrics expire", () => {
+  it("keeps a fresh token visible across a brief metrics gap, then removes unbought graduates", () => {
     const stale = { ...row("rejected", { totalFeesNative: 1.2, feeMetricsAt: now }),
       reasons: ["fee_metrics_stale"] };
     expect(readyForActivity(stale, filters, metadata, now + 121_000)).toBe(true);
     expect(readyForMetadata(stale, filters, now + 121_000, metadata)).toBe(true);
+    expect(readyForActivity(stale, filters, metadata, now + 5 * 60_000)).toBe(false);
+    expect(readyForMetadata(stale, filters, now + 5 * 60_000, metadata)).toBe(false);
+    expect(readyForActivity({ ...stale, state: "settled" }, filters, metadata, now + 5 * 60_000))
+      .toBe(true);
     expect(readyForActivity({ ...stale, reasons: ["total_fees_native_below_min"] },
       filters, metadata, now + 121_000)).toBe(false);
     expect(readyForActivity({ ...stale, candidate: { ...stale.candidate, totalFeesNative: 0.9 } },

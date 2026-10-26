@@ -50,6 +50,8 @@ export type FilterRule = {
 
 export type FilterSet = Record<Launchpad, FilterRule>;
 
+export const DEFAULT_MAX_GRADUATION_AGE_MS = 5 * 60_000;
+
 export const disabledFilters: FilterSet = {
   pumpfun: { enabled: false },
   stonkfun: { enabled: false },

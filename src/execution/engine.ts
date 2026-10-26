@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { type Allocation, type Candidate, type Chain, type Holder, evaluateCandidate, missingCandidateData,
+import { DEFAULT_MAX_GRADUATION_AGE_MS, type Allocation, type Candidate, type Chain, type Holder, evaluateCandidate, missingCandidateData,
   quarterOfCurrentBalance, splitBoughtTokens } from "../domain.js";
 import { Store } from "../store.js";
 
@@ -57,7 +57,7 @@ export class ExecutionEngine {
         : Number.MAX_SAFE_INTEGER,
       robinhood: this.chains.has("robinhood") ? store.getOrSetExecutionStartAt(options.activatedAt, "robinhood")
         : Number.MAX_SAFE_INTEGER };
-    this.maxGraduationAgeMs = options.maxGraduationAgeMs ?? 5 * 60_000;
+    this.maxGraduationAgeMs = options.maxGraduationAgeMs ?? DEFAULT_MAX_GRADUATION_AGE_MS;
     this.solFeeReserveLamports = options.solFeeReserveLamports ?? 50_000_000n;
     if (!Number.isSafeInteger(this.maxGraduationAgeMs) || this.maxGraduationAgeMs <= 0)
       throw new Error("Invalid graduation freshness limit");

@@ -1,4 +1,4 @@
-import { evaluateCandidate, missingCandidateData, type FilterSet } from "./domain.js";
+import { DEFAULT_MAX_GRADUATION_AGE_MS, evaluateCandidate, missingCandidateData, type FilterSet } from "./domain.js";
 import type { CandidateRow, TokenMetadata } from "./store.js";
 
 /** A public feed entry must have passed the current rules and have displayable metadata. */
@@ -9,10 +9,14 @@ export function readyForActivity(row: CandidateRow, filters: FilterSet, metadata
     row.reasons.every((reason) => reason === "fee_metrics_stale" || reason === "graduation_age_outside_range");
   if (row.state !== "eligible" && row.state !== "reserved" && row.state !== "settled" &&
       !historicalQualified) return false;
+  // An unbought graduate cannot be selected once the execution window closes.
+  if (row.state !== "reserved" && row.state !== "settled" &&
+      (row.candidate.graduatedAt > now || now - row.candidate.graduatedAt > DEFAULT_MAX_GRADUATION_AGE_MS))
+    return false;
   if (!metadata?.name || !metadata.symbol) return false;
   if (row.state === "reserved" || row.state === "settled") return true;
   const rule = filters[row.candidate.launchpad];
-  // Freshness limits protect new purchases; a previously verified token remains in feed history.
+  // Brief fee-metric gaps need not hide a fresh, previously verified token.
   const feedRule = rule && historicalQualified ? { ...rule, maxFeeMetricsAgeSeconds: undefined,
     maxGraduationAgeSeconds: undefined } : rule;
   if (!feedRule || evaluateCandidate(row.candidate, feedRule, now).length ||
