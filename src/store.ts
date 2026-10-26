@@ -462,6 +462,16 @@ export class Store {
     return startedAt;
   }
 
+  /** The first Solana trading activation also marks the start of the public launch feed. */
+  getExecutionStartAt(): number | undefined {
+    const row = this.db.prepare("SELECT value FROM settings WHERE key = 'execution_started_at'")
+      .get() as { value: string } | undefined;
+    if (!row) return undefined;
+    const startedAt = Number(row.value);
+    if (!Number.isSafeInteger(startedAt) || startedAt <= 0) throw new Error("Invalid stored execution start time");
+    return startedAt;
+  }
+
   /** Records only an already verified purchase; one round per graduation. */
   recordRound(input: RoundInput): void {
     if (!input.purchaseTx || input.receivedAtoms <= 0n || !Number.isSafeInteger(input.snapshotSlot) || input.snapshotSlot <= 0 ||

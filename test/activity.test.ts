@@ -35,6 +35,16 @@ describe("public activity qualification", () => {
     expect(readyForActivity(qualified, filters, metadata, now + 121_000)).toBe(false);
   });
 
+  it("hides pre-launch graduates from the live feed even if discovered after activation", () => {
+    const qualified = row("eligible", { totalFeesNative: 1.2, feeMetricsAt: now });
+    const startAt = now - 5_000;
+    expect(qualified.observedAt).toBeGreaterThan(startAt);
+    expect(readyForActivity(qualified, filters, metadata, now, startAt)).toBe(false);
+    expect(readyForMetadata(qualified, filters, now, metadata, startAt)).toBe(false);
+    const newGraduate = { ...qualified, candidate: { ...qualified.candidate, graduatedAt: startAt + 1 } };
+    expect(readyForActivity(newGraduate, filters, metadata, now, startAt)).toBe(true);
+  });
+
   it("keeps a previously qualified token in feed history after metrics expire", () => {
     const stale = { ...row("rejected", { totalFeesNative: 1.2, feeMetricsAt: now }),
       reasons: ["fee_metrics_stale"] };

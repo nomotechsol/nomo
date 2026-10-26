@@ -146,10 +146,11 @@ function classify(): void {
 
 async function hydrateQualifiedMetadata(): Promise<void> {
   const now = Date.now();
+  const feedStartAt = store.getExecutionStartAt();
   const filters = store.getFilters();
   const rows = store.listCandidates(10_000).filter((row) => {
     const cached = store.getTokenMetadata(row.candidate.chain, row.candidate.token);
-    if (!readyForMetadata(row, filters, now, cached)) return false;
+    if (!readyForMetadata(row, filters, now, cached, feedStartAt)) return false;
     return !cached || cached.expiresAt <= now;
   }).sort((a, b) => {
     const left = store.getTokenMetadata(a.candidate.chain, a.candidate.token)?.fetchedAt ?? 0;
@@ -167,9 +168,10 @@ async function hydrateQualifiedMetadata(): Promise<void> {
 function warmVisibleImages(): void {
   const filters = store.getFilters();
   const now = Date.now();
+  const feedStartAt = store.getExecutionStartAt();
   for (const row of store.listCandidates(100)) {
     const metadata = store.getTokenMetadata(row.candidate.chain, row.candidate.token);
-    if (readyForActivity(row, filters, metadata, now)) tokenImages.enqueue(metadata?.imageUrl);
+    if (readyForActivity(row, filters, metadata, now, feedStartAt)) tokenImages.enqueue(metadata?.imageUrl);
   }
 }
 
@@ -276,18 +278,22 @@ app.get<{ Params: { chain: string; token: string } }>("/api/token-metadata/:chai
   if (!store.hasCandidate(chain, token)) return reply.code(404).send({ error: "unknown_token" });
   const row = store.listCandidates(10_000).find((item) => item.candidate.chain === chain &&
     item.candidate.token.toLowerCase() === token.toLowerCase());
-  if (!row || !readyForMetadata(row, store.getFilters(), Date.now(), store.getTokenMetadata(chain, token)))
+  if (!row || !readyForMetadata(row, store.getFilters(), Date.now(), store.getTokenMetadata(chain, token),
+      store.getExecutionStartAt()))
     return reply.code(404).send({ error: "token_not_qualified" });
   const metadata = await getOrFetchTokenMetadata(store, chain, token);
   tokenImages.enqueue(metadata.imageUrl);
   return publicMetadata(metadata);
 });
-app.get("/api/activity", async () => {
+app.get("/api/activity", async (_request, reply) => {
+  reply.header("cache-control", "no-store");
   const rounds = new Map(store.listRounds(1000).map((round) => [round.candidateId, round]));
   const filters = store.getFilters();
   const now = Date.now();
+  const feedStartAt = store.getExecutionStartAt();
   const visible = store.listCandidates(10_000).filter((row) =>
-    readyForActivity(row, filters, store.getTokenMetadata(row.candidate.chain, row.candidate.token), now)).slice(0, 30);
+    readyForActivity(row, filters, store.getTokenMetadata(row.candidate.chain, row.candidate.token),
+      now, feedStartAt)).slice(0, 30);
   return { mode: executionMode(), items: visible.map((row) => {
     const job = store.getJob(row.id);
     const round = rounds.get(row.id);

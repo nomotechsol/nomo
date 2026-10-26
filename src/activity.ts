@@ -3,7 +3,8 @@ import type { CandidateRow, TokenMetadata } from "./store.js";
 
 /** A public feed entry must have passed the current rules and have displayable metadata. */
 export function readyForActivity(row: CandidateRow, filters: FilterSet, metadata: TokenMetadata | null,
-  now = Date.now()): boolean {
+  now = Date.now(), feedStartAt?: number): boolean {
+  if (feedStartAt !== undefined && row.candidate.graduatedAt <= feedStartAt) return false;
   const historicalQualified = row.state === "rejected" && row.reasons.length > 0 &&
     row.reasons.every((reason) => reason === "fee_metrics_stale" || reason === "graduation_age_outside_range");
   if (row.state !== "eligible" && row.state !== "reserved" && row.state !== "settled" &&
@@ -22,8 +23,9 @@ export function readyForActivity(row: CandidateRow, filters: FilterSet, metadata
 }
 
 export function readyForMetadata(row: CandidateRow, filters: FilterSet, now = Date.now(),
-  metadata: TokenMetadata | null = null): boolean {
-  if (row.state === "rejected") return readyForActivity(row, filters, metadata, now);
+  metadata: TokenMetadata | null = null, feedStartAt?: number): boolean {
+  if (feedStartAt !== undefined && row.candidate.graduatedAt <= feedStartAt) return false;
+  if (row.state === "rejected") return readyForActivity(row, filters, metadata, now, feedStartAt);
   if (row.state !== "eligible" && row.state !== "reserved" && row.state !== "settled") return false;
   const rule = filters[row.candidate.launchpad];
   if (row.state === "eligible" && (!rule || evaluateCandidate(row.candidate, rule, now).length ||

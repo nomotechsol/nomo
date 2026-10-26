@@ -5,6 +5,24 @@ import { join } from "node:path";
 import { Store } from "../src/store.js";
 
 describe("durable index state", () => {
+  it("keeps the first launch cutoff across restarts without deleting scanner history", () => {
+    const folder = mkdtempSync(join(tmpdir(), "nomo-launch-"));
+    const file = join(folder, "monitor.db");
+    try {
+      const first = new Store(file);
+      first.addCandidate({ chain: "sol", launchpad: "pumpfun", token: "Old", pool: "Pool",
+        graduationTx: "Sig", graduatedAt: 100 });
+      expect(first.getExecutionStartAt()).toBeUndefined();
+      expect(first.getOrSetExecutionStartAt(200)).toBe(200);
+      first.close();
+      const reopened = new Store(file);
+      expect(reopened.getExecutionStartAt()).toBe(200);
+      expect(reopened.getOrSetExecutionStartAt(300)).toBe(200);
+      expect(reopened.listCandidates()).toHaveLength(1);
+      reopened.close();
+    } finally { rmSync(folder, { recursive: true, force: true }); }
+  });
+
   it("keeps token names, tickers and images after reopening SQLite", () => {
     const folder = mkdtempSync(join(tmpdir(), "nomo-metadata-"));
     const file = join(folder, "monitor.db");
