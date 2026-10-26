@@ -413,17 +413,24 @@ app.get<{ Params: { solWallet: string } }>("/api/link/:solWallet", async (reques
 const webRoot = resolve("web-dist");
 if (existsSync(webRoot)) void app.register(staticPlugin, { root: webRoot, prefix: "/" });
 
-const timer = setInterval(() => { void poll(); }, 5_000);
-timer.unref();
-const payoutTimer = setInterval(() => {
-  if (solanaDistributor) void solanaDistributor.tick().then(() => { lastPayoutError = null; })
-    .catch((error: unknown) => {
-      lastPayoutError = error instanceof Error ? error.message : String(error);
-      app.log.error({ err: error }, "Solana automatic payout failed");
-    });
-}, 2_000);
-payoutTimer.unref();
-app.addHook("onClose", async () => { clearInterval(timer); clearInterval(payoutTimer);
+let timer: ReturnType<typeof setInterval> | undefined;
+let payoutTimer: ReturnType<typeof setInterval> | undefined;
+function startBackgroundWork(): void {
+  timer = setInterval(() => { void poll(); }, 5_000);
+  timer.unref();
+  payoutTimer = setInterval(() => {
+    if (solanaDistributor) void solanaDistributor.tick().then(() => { lastPayoutError = null; })
+      .catch((error: unknown) => {
+        lastPayoutError = error instanceof Error ? error.message : String(error);
+        app.log.error({ err: error }, "Solana automatic payout failed");
+      });
+  }, 2_000);
+  payoutTimer.unref();
+  void poll();
+}
+app.addHook("onClose", async () => {
+  if (timer) clearInterval(timer);
+  if (payoutTimer) clearInterval(payoutTimer);
   await solana?.stop(); store.close(); });
 
 try {
@@ -458,8 +465,8 @@ try {
         ...(rhAdapter ? ["robinhood" as const] : [])] });
   }
   classify();
-  await poll();
   await app.listen({ host: "127.0.0.1", port: Number(process.env.PORT ?? 8789) });
+  startBackgroundWork();
 } catch (error) {
   app.log.error({ err: error }, "server failed");
   await app.close();
