@@ -7,7 +7,7 @@ NOMO is an event-driven backend with a SQLite journal, chain-specific discovery,
 1. Helius, GMGN and EVM RPC scanners discover new launchpad graduations. The launchpad transaction, pair token and destination pool are checked on chain. Persistent scanner cursors and candidate IDs suppress duplicates.
 2. Fresh GMGN Total Fees and the configured launchpad filters qualify a candidate. Fees belong to the **candidate token** and serve only as a quality screen. Unknown required metrics block selection.
 3. The engine selects one qualifying candidate newer than its chain's activation timestamp. Graduations older than five minutes are not started. Before an unsigned buy, filters and age are checked again.
-4. The Solana treasury claims NOMO's own creator fees from the PUMP-quoted Pump.fun curve and PumpSwap pool. It converts available PUMP to SOL through a Raydium route, without Jupiter.
+4. The Solana treasury claims NOMO's own creator fees from the PUMP-quoted Pump.fun curve before migration and from both the curve and PumpSwap pool afterward. A separate recoverable job checks for fees every minute, independent of candidate graduations. It converts available PUMP to SOL through a Raydium route, without Jupiter.
 5. The engine budgets 25% of the current available SOL balance, keeping a SOL network reserve. Budgets under 1 SOL stop before a bridge or buy. BNB/RH budgets are bridged with Relay into their EVM treasuries and retain BNB/ETH gas reserves.
 6. A finalized NOMO holder snapshot identifies wallets holding at least 1,000,000 NOMO. Known bonding-curve and canonical PUMP-pool accounts are excluded.
 7. The destination-chain executor gets a fresh route and submits a signed buy. It verifies the transaction and measures the actual token balance increase. Pair assets may be non-native when a valid route exists.
@@ -29,7 +29,7 @@ BNB and RH use the **same EVM execution and claim classes** with different chain
 
 ## Operational limits
 
-- `LIVE_TRADING=true` requires a deployed NOMO mint, the canonical graduated PumpSwap pool with PUMP as quote token, a treasury signer matching the on-chain creator and a Solana reward signer with at least 0.01 SOL. `LIVE_BSC_TRADING` and `LIVE_RH_TRADING` each require their RPC and EVM key paths in addition to Solana live mode.
+- `LIVE_TRADING=true` requires a deployed NOMO mint, a bonding curve quoted in PUMP, a treasury signer matching the on-chain creator and a Solana reward signer with at least 0.01 SOL. It does not require NOMO to graduate. If the canonical PumpSwap pool exists, its mint, quote and creator must also match. `LIVE_BSC_TRADING` and `LIVE_RH_TRADING` each require their RPC and EVM key paths in addition to Solana live mode.
 - The finalized holder snapshot uses Solana `getProgramAccounts` at one bank view. The Helius plan must support the real NOMO holder set. If it does not, a slot-consistent indexed snapshot is needed.
 - Helius WebSocket alone cannot guarantee discovery during outages. GMGN and launchpad APIs provide bounded recent-history fallback, but high-volume periods can exceed their result limits. Guaranteed coverage would require a cursor-based indexed event stream.
 - Pump.fun candidates require an on-chain PumpSwap pool and Mayhem flag check. StonkFun's GMGN pool address is the destination CPMM pool; the original LaunchLab pool comes from StonkFun data and is verified by the migration transaction.

@@ -26,6 +26,7 @@ import { BackendSolanaSigner } from "./execution/backend-solana-signer.js";
 import { SolanaAutoDistributor } from "./execution/solana-auto-distributor.js";
 import { BackendEvmSigner } from "./execution/backend-evm-signer.js";
 import { BscExecutionAdapter } from "./execution/bsc-adapter.js";
+import { CreatorFeeCollector } from "./execution/creator-fee-collector.js";
 import type { ExecutionAdapter } from "./execution/engine.js";
 
 const liveSolana = process.env.LIVE_TRADING === "true";
@@ -116,6 +117,7 @@ const bscClaims = liveBsc ? new BackendBscClaims(store, process.env.BSC_RPC_URL!
   BackendEvmSigner.fromFile(process.env.BSC_REWARD_KEY_PATH!)) : undefined;
 const rhClaims = liveRh ? new BackendBscClaims(store, process.env.RH_RPC_URL!,
   BackendEvmSigner.fromFile(process.env.RH_REWARD_KEY_PATH!), "robinhood") : undefined;
+const feeCollector = solanaAdapter ? new CreatorFeeCollector(store, solanaAdapter) : undefined;
 let execution: ExecutionEngine | undefined;
 
 const app = Fastify({ logger: true });
@@ -123,6 +125,7 @@ let polling = false;
 let lastPollAt: number | null = null;
 let lastPollError: string | null = null;
 let lastPayoutError: string | null = null;
+let lastFeeCollectionError: string | null = null;
 let lastSolPollAt = 0;
 
 function classify(): void {
@@ -200,6 +203,14 @@ async function poll(): Promise<void> {
     classify();
     await hydrateQualifiedMetadata();
     warmVisibleImages();
+    if (feeCollector && !store.getActiveJob()) {
+      try {
+        if (await feeCollector.tick()) lastFeeCollectionError = null;
+      } catch (error) {
+        lastFeeCollectionError = error instanceof Error ? error.message : String(error);
+        errors.push(`NOMO creator fees: ${lastFeeCollectionError}`);
+      }
+    }
     if (execution) {
       try { await execution.tick(); }
       catch (error) { errors.push(`Execution: ${error instanceof Error ? error.message : String(error)}`); }
@@ -217,7 +228,7 @@ const executionMode = () => !liveSolana ? "read_only" :
   ["solana", liveBsc && "bsc", liveRh && "rh", "live"].filter(Boolean).join("_");
 app.get("/health", async () => ({ ok: true, mode: executionMode(), evmScanners: scanners.length,
   solanaScanner: Boolean(solana), solanaClaims: Boolean(solanaClaims),
-  solanaAutoDelivery: Boolean(solanaDistributor), lastPayoutError,
+  solanaAutoDelivery: Boolean(solanaDistributor), lastPayoutError, lastFeeCollectionError,
   bscClaims: Boolean(bscClaims), rhClaims: Boolean(rhClaims), gmgnRhDiscovery: Boolean(gmgnRh),
   lastPollAt, lastPollError }));
 app.get("/api/candidates", async () => ({ items: store.listCandidates(), filters: store.getFilters(),

@@ -41,48 +41,51 @@ export class SolanaExecutionAdapter implements ExecutionAdapter {
     this.sdk = new OnlinePumpSdk(connection);
   }
 
-  /** Refuse to start buying until the mint, treasury ownership and PUMP pool are real. */
+  /** The creator's PUMP-quoted curve is enough to start before NOMO migrates. */
   async assertReady(): Promise<void> {
-    const [mintInfo, poolInfo, rewardSol] = await Promise.all([
+    const [mintInfo, rewardSol] = await Promise.all([
       this.connection.getAccountInfo(this.mainMint, "finalized"),
-      this.connection.getAccountInfo(this.mainPool(), "finalized"),
       this.connection.getBalance(this.rewardSigner.publicKey, "finalized"),
     ]);
     if (!mintInfo || ![TOKEN_PROGRAM_ID.toBase58(), TOKEN_2022_PROGRAM_ID.toBase58()]
       .includes(mintInfo.owner.toBase58())) throw new Error("NOMO mint is not deployed");
-    if (!poolInfo?.owner.equals(PUMP_AMM_PROGRAM_ID)) throw new Error("NOMO PUMP pool is not graduated");
     if (rewardSol < 10_000_000) throw new Error("Reward wallet needs at least 0.01 SOL for payout fees and rent");
-    const pool = PUMP_AMM_SDK.decodePool(poolInfo);
+    await this.feeAccounts();
+  }
+
+  private async feeAccounts() {
     const curve = await this.sdk.fetchBondingCurve(this.mainMint);
+    if (!curve.creator.equals(this.signer.publicKey) || !curve.quoteMint.equals(PUMP) || curve.isHolderReward)
+      throw new Error("NOMO curve creator or PUMP quote differs from the execution wallet");
+    const poolInfo = await this.connection.getAccountInfo(this.mainPool(), "finalized");
+    if (!poolInfo) return { curve, pool: null };
+    if (!poolInfo.owner.equals(PUMP_AMM_PROGRAM_ID)) throw new Error("NOMO canonical PUMP pool has an invalid owner");
+    const pool = PUMP_AMM_SDK.decodePool(poolInfo);
     if (!pool.baseMint.equals(this.mainMint) || !pool.quoteMint.equals(PUMP) ||
-        !pool.coinCreator.equals(this.signer.publicKey) ||
-        !curve.creator.equals(this.signer.publicKey) || !curve.quoteMint.equals(PUMP))
+        !pool.coinCreator.equals(this.signer.publicKey) || pool.isHolderReward)
       throw new Error("NOMO pool, quote or fee recipient does not match the execution wallet");
+    return { curve, pool };
   }
 
   async collectCreatorFees(operationId: string): Promise<{ tx: string }> {
-    const curve = await this.sdk.fetchBondingCurve(this.mainMint);
-    if (!curve.creator.equals(this.signer.publicKey) || !curve.quoteMint.equals(PUMP))
-      throw new Error("NOMO curve creator or quote mint differs from execution wallet");
-    const poolKey = this.mainPool();
-    const poolInfo = await this.connection.getAccountInfo(poolKey, "finalized");
-    if (!poolInfo?.owner.equals(PUMP_AMM_PROGRAM_ID)) throw new Error("NOMO PumpSwap pool is not graduated");
-    const pool = PUMP_AMM_SDK.decodePool(poolInfo);
-    if (!pool.coinCreator.equals(this.signer.publicKey) || !pool.quoteMint.equals(PUMP))
-      throw new Error("NOMO PumpSwap creator or quote mint differs from execution wallet");
-    const sweepCurve = await PUMP_SDK.sweepCreatorFeeInstruction({ payer: this.signer.publicKey,
-      mint: this.mainMint, creator: this.signer.publicKey, quoteMint: PUMP,
-      quoteTokenProgram: TOKEN_PROGRAM_ID });
-    const sweepPool = await PUMP_SDK.sweepPoolCreatorFeeInstruction({ payer: this.signer.publicKey,
-      mint: this.mainMint, coinCreator: this.signer.publicKey, quoteMint: PUMP,
-      quoteTokenProgram: TOKEN_PROGRAM_ID });
-    await this.sender.execute(`${operationId}:sweep`, async () => this.transaction([sweepCurve, sweepPool], 700_000));
+    const { curve, pool } = await this.feeAccounts();
+    const sweeps: TransactionInstruction[] = [];
+    if (!curve.creatorFee.isZero()) sweeps.push(await PUMP_SDK.sweepCreatorFeeInstruction({
+      payer: this.signer.publicKey, mint: this.mainMint, creator: this.signer.publicKey,
+      quoteMint: PUMP, quoteTokenProgram: TOKEN_PROGRAM_ID }));
+    if (pool && !pool.creatorFees.isZero()) sweeps.push(await PUMP_SDK.sweepPoolCreatorFeeInstruction({
+      payer: this.signer.publicKey, mint: this.mainMint, coinCreator: this.signer.publicKey,
+      quoteMint: PUMP, quoteTokenProgram: TOKEN_PROGRAM_ID }));
+    if (sweeps.length) await this.sender.execute(`${operationId}:sweep`,
+      async () => this.transaction(sweeps, 700_000));
+    const balances = await this.sdk.getCreatorVaultQuoteBalances(this.signer.publicKey, [PUMP]);
+    if (!balances.some((balance) => balance.mint.equals(PUMP) && !balance.total.isZero()))
+      return { tx: "no-pump-fees" };
     const instructions = await this.sdk.collectCoinCreatorFeeAllQuotesInstructions(this.signer.publicKey,
       this.signer.publicKey, [PUMP]);
-    if (instructions.length === 0) return { tx: "no-creator-fees" };
-    // PUMP fees are the intended treasury source; other quote assets require explicit handling.
+    // Only the PUMP quote funds this treasury, even if the creator has other coins.
     const pumpInstructions = instructions.filter((ix) => ix.keys.some((key) => key.pubkey.equals(PUMP)));
-    if (pumpInstructions.length === 0) return { tx: "no-pump-fees" };
+    if (pumpInstructions.length === 0) throw new Error("PUMP creator fees exist but no collection instruction was built");
     const tx = await this.sender.execute(`${operationId}:collect`, async () => this.transaction(pumpInstructions, 700_000));
     return { tx };
   }

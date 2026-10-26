@@ -46,13 +46,13 @@ Scroll your feed. NOMO watches for new graduates. When an eligible token migrate
                            70% holder pool               30% treasury
 ```
 
-The other token's GMGN **Total Fees** is an eligibility filter. It is separate from NOMO's own creator fees, which fund purchases. The backend claims NOMO fees before processing an eligible graduation; there is currently no independent periodic fee-claim job.
+The other token's GMGN **Total Fees** is an eligibility filter. It is separate from NOMO's own creator fees, which fund purchases. The backend claims NOMO fees independently every minute and again before processing an eligible graduation. Fee collection starts on NOMO's bonding curve and adds the PumpSwap pool when NOMO migrates.
 
 ## How a round works
 
 1. Discover a migration and verify the launchpad event and pool on chain.
 2. Require fresh GMGN Total Fees and apply the configured filters. Mayhem Mode is excluded on Pump.fun.
-3. Claim NOMO creator fees from its PUMP-quoted curve and PumpSwap pool; swap collected PUMP to SOL without Jupiter.
+3. Claim NOMO creator fees from its PUMP-quoted curve and, after migration, its PumpSwap pool; swap collected PUMP to SOL without Jupiter.
 4. Reserve 25% of the treasury's available SOL balance. If that budget is below **1 SOL**, skip this graduation without bridging or buying. Otherwise bridge to BNB or Robinhood Chain when needed, leaving native gas reserves.
 5. Take a finalized snapshot of NOMO holders at the purchase. Wallets need at least **1,000,000 NOMO**; known bonding-curve and liquidity-pool accounts are excluded.
 6. Buy the graduated token through a validated route. The pair may be quoted in another asset if a liquid route exists.
@@ -86,7 +86,7 @@ The API runs on `127.0.0.1:8789` by default. In another terminal, `npm run web:d
 
 ## Verification and launch boundary
 
-The project has unit and local integration tests for candidate filtering, sequential 25% budgeting, allocation math, recovery, wallet linking and payouts. Historical purchase routes were also checked on local Solana forks or through read-only EVM simulation. These checks are **not** proof of a full funded NOMO round: NOMO has no mint or PUMP pool yet, so its real creator-fee claim and PUMP-to-SOL conversion have not run end to end. Mainnet trading must stay disabled until the mint, creator wallet, separate reward wallets and a small funded round are verified.
+The project has unit and local integration tests for candidate filtering, sequential 25% budgeting, allocation math, recovery, wallet linking and payouts. Historical purchase routes were also checked on local Solana forks or through read-only EVM simulation. These checks are **not** proof of a full funded NOMO round: NOMO has no mint yet, so its real creator-fee claim and PUMP-to-SOL conversion have not run end to end. Live execution can start before NOMO graduates once its PUMP-quoted curve, creator wallet, reward wallet and funding are verified; a small funded round still needs mainnet reconciliation.
 
 Backend signing keys belong in private files outside the repository, referenced by paths in `.env`. Never commit a seed phrase, keypair, API token, `.env` file or production database.
 

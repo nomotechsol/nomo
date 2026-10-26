@@ -17,7 +17,7 @@ See [`config/filters.example.json`](../config/filters.example.json) for the acti
 
 The execution journal handles one candidate at a time. On activation it stores a per-chain start time; only newer graduations can be bought. An eligible candidate must also be no more than five minutes old when selected and before an unsigned buy is prepared.
 
-For each selected candidate, the backend claims NOMO creator fees from the PUMP-quoted Pump.fun curve and PumpSwap pool, swaps PUMP to SOL, and calculates 25% of the current available SOL treasury balance. A budget below **1 SOL** aborts the purchase before any bridge or buy. The minimum applies to Solana, BNB and Robinhood purchases because their budget originates in SOL.
+An independent journaled job checks for NOMO creator fees every minute: it sweeps the PUMP-quoted Pump.fun curve before migration, adds the PumpSwap pool after migration, claims the fees and swaps collected PUMP to SOL. It resumes the same operation IDs after a restart. Each selected candidate also triggers a fresh claim before the backend calculates 25% of the current available SOL treasury balance. A budget below **1 SOL** aborts the purchase before any bridge or buy. The minimum applies to Solana, BNB and Robinhood purchases because their budget originates in SOL.
 
 For BNB and RH, Relay bridges the allocated SOL to the destination treasury, leaving a native gas reserve (default 0.002 BNB or 0.002 ETH). BNB swaps use a validated public Relay route. RH first quotes the on-chain Pons Uniswap v4 route and uses Relay only when the direct route is unavailable. A missing or changed route stops the buy. Purchases allow 99% slippage, so the minimum output can be only 1% of the current quote. The actual received balance, not the quote, is used to determine the reward amount.
 
@@ -58,7 +58,7 @@ These checks are local or read-only. They do not cover a complete mainnet round 
 
 ## Activation checks
 
-1. Deploy NOMO and provide its mint. Its canonical PumpSwap pool must quote PUMP, and the treasury key must match the creator recorded by both the bonding curve and pool. `SolanaExecutionAdapter.assertReady()` verifies this on chain. A random LP address cannot override the canonical pool identity.
+1. Deploy NOMO and provide its mint. Its bonding curve must quote PUMP, and the treasury key must match the curve creator. NOMO does **not** have to graduate first. If its canonical PumpSwap pool has appeared, its quote and creator must also match. `SolanaExecutionAdapter.assertReady()` verifies the applicable on-chain state. An arbitrary LP address cannot override the canonical pool identity.
 2. Put the Solana treasury and reward keypair JSON files outside the repository with `0600` permissions. Set `SOLANA_TREASURY_KEYPAIR_PATH`, `SOLANA_REWARD_KEYPAIR_PATH` and `MAIN_TOKEN_MINT`. The reward wallet must hold at least 0.01 SOL for startup; actual automatic payouts may need more for fees and account rent.
 3. Set EVM treasury and reward key paths for any chain being activated (`BSC_*` and `RH_*`). The same pair can serve both EVM chains. The treasury receives bridged native currency; the reward wallet holds the 70% allocation and sends claims.
 4. Confirm RPC health, fresh GMGN metrics, live route quotes, sufficient SOL treasury balance, a funded Solana reward wallet and no unresolved execution journal entry. A 1 SOL minimum buy at 25% of current balance generally requires at least about 4 SOL available after the Solana reserve, unless creator fees increase the balance first.
