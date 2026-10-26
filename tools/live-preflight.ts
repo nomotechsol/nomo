@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { getMint, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddressSync, getMint, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { createRequire } from "node:module";
 import { Store } from "../src/store.js";
@@ -102,9 +102,15 @@ try {
 
   try {
     const pumpMint = await getMint(connection, PUMP, "confirmed", TOKEN_2022_PROGRAM_ID);
-    await new RaydiumFundingQuotes(connection).quotePair(PUMP, SOL,
-      10n ** BigInt(pumpMint.decimals), 9900);
-    ok("PUMP to SOL", "read-only Raydium route quote succeeded");
+    const onePump = 10n ** BigInt(pumpMint.decimals);
+    const routes = new RaydiumFundingQuotes(connection);
+    const quote = await routes.quotePair(PUMP, SOL, onePump, 9900);
+    const pumpAta = getAssociatedTokenAddressSync(PUMP, treasury.publicKey, false, TOKEN_2022_PROGRAM_ID);
+    const pumpAccount = await connection.getAccountInfo(pumpAta, "confirmed");
+    if (pumpAccount && (await getAccount(connection, pumpAta, "confirmed", TOKEN_2022_PROGRAM_ID)).amount >= onePump) {
+      await routes.buildUnsignedTransactions(quote, treasury.publicKey, 0n);
+      ok("PUMP to SOL", "read-only Raydium quote and transaction build succeeded");
+    } else warn("PUMP to SOL", "quote succeeded; transaction build awaits at least 1 PUMP in treasury");
   } catch (error) { fail("PUMP to SOL", error); }
 
   const gmgnKey = required("GMGN_API_KEY");

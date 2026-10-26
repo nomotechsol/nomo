@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import BN from "bn.js";
-import { NATIVE_MINT } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Connection, PublicKey, TransactionMessage, VersionedTransaction,
   type TransactionInstruction } from "@solana/web3.js";
 import { type Candidate } from "../domain.js";
@@ -133,17 +134,31 @@ export class RaydiumFundingQuotes {
     if (Date.now() - quote.quotedAt > 25_000 || quote.quotedAt > Date.now() ||
         computeUnitPriceMicroLamports < 0n || computeUnitPriceMicroLamports > 1_000_000n)
       throw new Error("Raydium quote expired or compute-unit price is invalid");
+    let inputAccount: string | undefined;
+    if (quote.inputMint !== NATIVE_MINT.toBase58()) {
+      const mint = new PublicKey(quote.inputMint);
+      const mintInfo = await this.connection.getAccountInfo(mint, "confirmed");
+      if (!mintInfo || (!mintInfo.owner.equals(TOKEN_PROGRAM_ID) &&
+          !mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID)))
+        throw new Error("Raydium input mint has an invalid token program");
+      const ata = getAssociatedTokenAddressSync(mint, user, false, mintInfo.owner);
+      const account = await getAccount(this.connection, ata, "confirmed", mintInfo.owner);
+      if (!account.owner.equals(user) || !account.mint.equals(mint) || account.amount < quote.inputLamports)
+        throw new Error("Raydium input token account has insufficient balance");
+      inputAccount = ata.toBase58();
+    }
     const response = await this.request("https://transaction-v1.raydium.io/transaction/swap-base-in", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ computeUnitPriceMicroLamports: computeUnitPriceMicroLamports.toString(),
         swapResponse: quote.swapResponse, txVersion: "V0", wallet: user.toBase58(),
         wrapSol: quote.inputMint === NATIVE_MINT.toBase58(),
-        unwrapSol: quote.quoteMint === NATIVE_MINT.toBase58() }), signal: AbortSignal.timeout(15_000),
+        unwrapSol: quote.quoteMint === NATIVE_MINT.toBase58(), inputAccount }), signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new Error(`Raydium transaction builder HTTP ${response.status}`);
-    const result = await response.json() as { success?: boolean; data?: Array<{ transaction?: string }> };
+    const result = await response.json() as { success?: boolean; msg?: string;
+      data?: Array<{ transaction?: string }> };
     if (!result.success || !Array.isArray(result.data) || result.data.length < 1 || result.data.length > 4)
-      throw new Error("Raydium transaction builder returned no usable transactions");
+      throw new Error(`Raydium transaction builder returned no usable transactions: ${result.msg ?? "unknown error"}`);
     const transactions: VersionedTransaction[] = [];
     const allAccounts = new Set<string>();
     let hasRaydiumSwap = false;
@@ -175,7 +190,7 @@ export class RaydiumFundingQuotes {
       transactions.push(transaction);
     }
     if (!hasRaydiumSwap || quote.pools.some((pool) => !allAccounts.has(pool)) ||
-        !allAccounts.has(quote.quoteMint))
+        !allAccounts.has(quote.quoteMint) || (inputAccount && !allAccounts.has(inputAccount)))
       throw new Error("Raydium transaction differs from the verified quote route");
     return transactions;
   }
