@@ -5,8 +5,9 @@ import { rename, writeFile } from "node:fs/promises";
 import { get } from "node:https";
 import { isIP } from "node:net";
 import { join } from "node:path";
+import sharp from "sharp";
 
-const maxImageBytes = 1_500_000;
+const maxImageBytes = 8_000_000;
 const imageTypes = {
   png: "image/png", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif", avif: "image/avif",
 } as const;
@@ -136,10 +137,13 @@ export class TokenImageCache {
     const bytes = await download(url);
     const ext = imageExtension(bytes);
     if (!ext) throw new Error("Unsupported token image format");
-    const path = join(this.directory, `${this.digest(url)}.${ext}`);
+    const optimized = await sharp(bytes, { limitInputPixels: 16_000_000, failOn: "error" })
+      .rotate().resize(192, 192, { fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 78, effort: 4 }).toBuffer();
+    const path = join(this.directory, `${this.digest(url)}.webp`);
     if (existsSync(path)) return;
     const temporary = `${path}.${randomUUID()}.tmp`;
-    await writeFile(temporary, bytes, { flag: "wx", mode: 0o644 });
+    await writeFile(temporary, optimized, { flag: "wx", mode: 0o644 });
     await rename(temporary, path);
   }
 }
