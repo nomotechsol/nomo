@@ -77,10 +77,10 @@ export class SolanaExecutionAdapter implements ExecutionAdapter {
     const sweeps: TransactionInstruction[] = [];
     if (!curve.creatorFee.isZero()) sweeps.push(await PUMP_SDK.sweepCreatorFeeInstruction({
       payer: this.signer.publicKey, mint: this.mainMint, creator: this.signer.publicKey,
-      quoteMint: PUMP, quoteTokenProgram: TOKEN_PROGRAM_ID }));
+      quoteMint: PUMP, quoteTokenProgram: TOKEN_2022_PROGRAM_ID }));
     if (pool && !pool.creatorFees.isZero()) sweeps.push(await PUMP_SDK.sweepPoolCreatorFeeInstruction({
       payer: this.signer.publicKey, mint: this.mainMint, coinCreator: this.signer.publicKey,
-      quoteMint: PUMP, quoteTokenProgram: TOKEN_PROGRAM_ID }));
+      quoteMint: PUMP, quoteTokenProgram: TOKEN_2022_PROGRAM_ID }));
     if (sweeps.length) await this.sender.execute(`${operationId}:sweep`,
       async () => this.transaction(sweeps, 700_000));
     const balances = await this.sdk.getCreatorVaultQuoteBalances(this.signer.publicKey, [PUMP]);
@@ -96,10 +96,10 @@ export class SolanaExecutionAdapter implements ExecutionAdapter {
   }
 
   async convertPumpToSol(operationId: string): Promise<{ tx: string }> {
-    const ata = getAssociatedTokenAddressSync(PUMP, this.signer.publicKey);
+    const ata = getAssociatedTokenAddressSync(PUMP, this.signer.publicKey, false, TOKEN_2022_PROGRAM_ID);
     const info = await this.connection.getAccountInfo(ata, "confirmed");
     if (!info) return { tx: "no-pump-balance" };
-    const amount = (await getAccount(this.connection, ata, "confirmed")).amount;
+    const amount = (await getAccount(this.connection, ata, "confirmed", TOKEN_2022_PROGRAM_ID)).amount;
     if (amount === 0n) return { tx: "no-pump-balance" };
     const quote = await this.raydium.quotePair(PUMP, NATIVE, amount, PURCHASE_SLIPPAGE_BPS);
     const transactions = await this.raydium.buildUnsignedTransactions(quote, this.signer.publicKey, 0n);

@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { getMint } from "@solana/spl-token";
+import { getMint, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { createRequire } from "node:module";
 import { Store } from "../src/store.js";
@@ -73,13 +73,15 @@ try {
   const reward = BackendSolanaSigner.fromFile(privateFile("SOLANA_REWARD_KEYPAIR_PATH"));
   const sol = new SolanaExecutionAdapter(store, rpc, connection, treasury, reward,
     mint.toBase58(), lp.toBase58());
-  await sol.assertReady();
+  let solReady = true;
+  try { await sol.assertReady(); }
+  catch (error) { fail("Solana readiness", error); solReady = false; }
   const [poolAccount, treasuryLamports, rewardLamports] = await Promise.all([
     connection.getAccountInfo(lp, "finalized"),
     connection.getBalance(treasury.publicKey, "finalized"),
     connection.getBalance(reward.publicKey, "finalized"),
   ]);
-  ok("Solana fee authority", `creator matches treasury; PUMP quote; LP ${poolAccount ? "deployed" : "not yet deployed"}`);
+  if (solReady) ok("Solana fee authority", `creator matches treasury; PUMP quote; LP ${poolAccount ? "deployed" : "not yet deployed"}`);
   ok("Solana wallets", `treasury ${treasury.publicKey.toBase58()}, reward ${reward.publicKey.toBase58()}`);
   if (treasuryLamports < 4_000_000_000)
     warn("treasury balance", `${(treasuryLamports / 1e9).toFixed(4)} SOL; a 1 SOL minimum buy needs about 4 SOL before fees`);
@@ -99,7 +101,7 @@ try {
   }
 
   try {
-    const pumpMint = await getMint(connection, PUMP, "confirmed");
+    const pumpMint = await getMint(connection, PUMP, "confirmed", TOKEN_2022_PROGRAM_ID);
     await new RaydiumFundingQuotes(connection).quotePair(PUMP, SOL,
       10n ** BigInt(pumpMint.decimals), 9900);
     ok("PUMP to SOL", "read-only Raydium route quote succeeded");
