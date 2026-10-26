@@ -26,6 +26,9 @@ export type PurchaseRow = { candidateId: string; chain: Chain; launchpad: Candid
   spendAtoms: string | null; budgetLamports: string | null; createdAt: number };
 export type PurchaseTotals = { count: number; solBudgetLamports: string | null;
   chains: Record<Chain, { count: number; spendAtoms: string | null }> };
+export type SolanaPayoutBatchRow = { id: number; token: string; signature: string;
+  sentAt: number; recipientCount: number; recipients: Array<{ wallet: string; rewardAtoms: string }>;
+  rewardDecimals: number };
 
 function nonnegativeAtoms(value: unknown): string | null {
   return typeof value === "string" && /^(0|[1-9]\d*)$/.test(value) ? value : null;
@@ -329,6 +332,27 @@ export class Store {
     return this.db.prepare(`SELECT state, signature FROM solana_payouts
       WHERE candidate_id = ? AND sol_wallet = ?`).get(candidateId, solWallet) as
       { state: "pending" | "batched" | "sent"; signature: string | null } | undefined;
+  }
+
+  solanaPayoutBatchPage(limit = 10, beforeId?: number): { items: SolanaPayoutBatchRow[]; nextCursor: number | null } {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10 ||
+        (beforeId !== undefined && (!Number.isSafeInteger(beforeId) || beforeId < 1)))
+      throw new Error("Invalid payout page");
+    const rows = this.db.prepare(`SELECT b.id, b.signature, b.sent_at AS sentAt,
+      c.token, r.reward_decimals AS rewardDecimals
+      FROM solana_payout_batches b
+      JOIN candidates c ON c.id = b.candidate_id
+      JOIN rounds r ON r.candidate_id = b.candidate_id
+      WHERE b.state = 'sent' AND b.signature IS NOT NULL ${beforeId === undefined ? "" : "AND b.id < ?"}
+      ORDER BY b.id DESC LIMIT ?`).all(...(beforeId === undefined ? [limit + 1] : [beforeId, limit + 1])) as
+      Array<{ id: number; signature: string; sentAt: number; token: string; rewardDecimals: number }>;
+    const page = rows.slice(0, limit);
+    const recipients = this.db.prepare(`SELECT sol_wallet AS wallet, reward_atoms AS rewardAtoms
+      FROM solana_payouts WHERE batch_id = ? AND state = 'sent' ORDER BY sol_wallet`);
+    return { items: page.map((row) => {
+      const holders = recipients.all(row.id) as Array<{ wallet: string; rewardAtoms: string }>;
+      return { ...row, recipientCount: holders.length, recipients: holders };
+    }), nextCursor: rows.length > limit ? page.at(-1)!.id : null };
   }
 
   nextSolanaPayoutBatch(maxRecipients = 4): { id: number; candidateId: string;

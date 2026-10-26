@@ -81,7 +81,10 @@ h1, h2, h3, p { margin: 0; }
 .activity-main .token-copy { font-size: 15px; }
 .activity-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; color: var(--muted); font-size: 12px; }
 .activity-result { text-align: right; }
-.activity-result strong { display: block; color: #228c53; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.activity-result strong, .activity-result a { display: block; color: #228c53; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.activity-result a, .stats-spend a { text-decoration: none; }
+.activity-result a:hover, .stats-spend a:hover, .payout-log a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.activity-result a:focus-visible, .stats-spend a:focus-visible, .payout-log a:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; }
 .activity-result small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
 .activity-footer { display: flex; align-items: center; gap: 9px; min-height: 55px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: #000; }
@@ -334,6 +337,11 @@ body { overflow-x: hidden; }
 .stats-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-top: 30px; padding-bottom: 11px; border-bottom: 1px solid var(--line); }
 .stats-list-heading h3 { font-size: 25px; font-weight: 400; letter-spacing: -.035em; }
 .stats-list-heading span { color: var(--muted); font-size: 12px; }
+.stats-tabs { display: flex; align-items: baseline; gap: 18px; }
+.stats-tabs button { padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 21px; letter-spacing: -.035em; cursor: pointer; }
+.stats-tabs button[aria-selected="true"] { color: #000; }
+.stats-tabs button:hover { color: #000; }
+.stats-tabs button:focus-visible { outline: 2px solid var(--violet); outline-offset: 4px; }
 .stats-scroll { flex: 1; min-height: 120px; max-height: 330px; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: #d7d7d7 transparent; }
 .stats-scroll:focus-visible { outline: 2px solid var(--violet); outline-offset: -2px; }
 .stats-row { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 13px; min-height: 72px; padding: 11px 0; border-bottom: 1px solid var(--quiet); }
@@ -343,8 +351,14 @@ body { overflow-x: hidden; }
 .stats-token .token-copy { font-size: 14px; }
 .stats-token small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; color: var(--muted); font-size: 11px; }
 .stats-spend { text-align: right; }
-.stats-spend strong { display: block; color: #228c53; white-space: nowrap; font-size: 14px; font-weight: 500; }
+.stats-spend strong, .stats-spend a { display: block; color: #228c53; white-space: nowrap; font-size: 14px; font-weight: 500; }
 .stats-spend small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+.payout-log { padding: 14px 0; border-bottom: 1px solid var(--quiet); }
+.payout-log-summary { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.payout-log-summary strong { display: block; font-size: 14px; font-weight: 500; }
+.payout-log-summary small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.payout-log a { flex: none; color: #228c53; font-size: 12px; text-decoration: none; }
+.payout-recipients { display: flex; flex-wrap: wrap; gap: 5px 14px; margin-top: 9px; color: var(--muted); font-size: 11px; }
 .stats-empty { padding: 34px 0; color: var(--muted); font-size: 14px; text-align: center; }
 .stats-load-state { padding: 8px 0; color: var(--muted); font-size: 12px; text-align: center; }
 .stats-retry { border: 0; background: transparent; color: var(--violet); font: inherit; cursor: pointer; text-decoration: underline; }
@@ -422,7 +436,7 @@ body { overflow-x: hidden; }
   .activity-main strong, .activity-main .token-copy { font-size: 14px; }
   .activity-main small { font-size: 11px; }
   .activity-result { grid-column: 3; text-align: right; margin-top: 0; }
-  .activity-result strong { font-size: 12px; }
+  .activity-result strong, .activity-result a { font-size: 12px; }
   .activity-result small { display: block; font-size: 10px; }
   .activity-footer { min-height: 30px; }
   .rewards-modal { width: calc(100vw - 16px); max-height: 94svh; padding: 25px 18px; border-radius: 20px; }
@@ -443,11 +457,12 @@ body { overflow-x: hidden; }
   .stats-chain-card strong { font-size: 14px; }
   .stats-chain-card small { font-size: 9px; }
   .stats-list-heading { margin-top: 19px; }
-  .stats-list-heading h3 { font-size: 21px; }
+  .stats-tabs { gap: 13px; }
+  .stats-tabs button { font-size: 17px; }
   .stats-scroll { max-height: 40svh; }
   .stats-row { grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; min-height: 62px; }
   .stats-row .activity-avatar { width: 34px; height: 34px; border-radius: 11px; }
-  .stats-token strong, .stats-spend strong { font-size: 11px; }
+  .stats-token strong, .stats-spend strong, .stats-spend a { font-size: 11px; }
   .stats-token small, .stats-spend small { font-size: 9px; }
   .stats-note { font-size: 10px; }
   .thesis-modal { width: calc(100vw - 16px); max-height: 94svh; padding: 24px 20px; border-radius: 20px; }

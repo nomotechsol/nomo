@@ -45,11 +45,13 @@ export class ExecutionEngine {
   private readonly maxGraduationAgeMs: number;
   private readonly solFeeReserveLamports: bigint;
   private readonly chains: ReadonlySet<Chain>;
+  private readonly excludedSolanaMint?: string;
 
   constructor(private readonly store: Store, private readonly adapter: ExecutionAdapter,
     options: { activatedAt: number; maxGraduationAgeMs?: number; solFeeReserveLamports?: bigint;
-      chains?: Chain[] }) {
+      chains?: Chain[]; excludedSolanaMint?: string }) {
     this.chains = new Set(options.chains ?? ["sol", "bsc", "robinhood"]);
+    this.excludedSolanaMint = options.excludedSolanaMint;
     this.executionStartAt = { sol: store.getOrSetExecutionStartAt(options.activatedAt),
       bsc: this.chains.has("bsc") ? store.getOrSetExecutionStartAt(options.activatedAt, "bsc")
         : Number.MAX_SAFE_INTEGER,
@@ -68,6 +70,7 @@ export class ExecutionEngine {
       const filters = this.store.getFilters();
       const eligible = this.store.listCandidates(10_000).filter((row) => row.state === "eligible" &&
         this.chains.has(row.candidate.chain) &&
+        !(row.candidate.chain === "sol" && row.candidate.token === this.excludedSolanaMint) &&
         row.candidate.graduatedAt > this.executionStartAt[row.candidate.chain] && row.candidate.graduatedAt <= now &&
         now - row.candidate.graduatedAt <= this.maxGraduationAgeMs)
         .sort((a, b) => a.candidate.graduatedAt - b.candidate.graduatedAt || a.id.localeCompare(b.id));
@@ -87,6 +90,8 @@ export class ExecutionEngine {
     if (!active) throw new Error("Purchase journal was not created");
     const candidate = this.store.getCandidate(active.candidateId)?.candidate;
     if (!candidate) throw new Error("Journal candidate is missing");
+    if (candidate.chain === "sol" && candidate.token === this.excludedSolanaMint)
+      throw new Error("Project mint cannot be purchased by NOMO");
     if (!this.chains.has(candidate.chain)) throw new Error(`Pending ${candidate.chain} job requires its execution adapter`);
     if (candidate.graduatedAt <= this.executionStartAt[candidate.chain])
       throw new Error("Purchase journal predates trading activation");

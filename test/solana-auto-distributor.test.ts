@@ -71,6 +71,14 @@ describe("automatic Solana holder distribution", () => {
       expect(TransactionMessage.decompile(sent[1]!.message).instructions).toHaveLength(2);
       expect(await second.tick()).toBeUndefined();
       expect(sent).toHaveLength(2);
+      const firstPage = reopened.solanaPayoutBatchPage(1);
+      expect(firstPage.items).toHaveLength(1);
+      expect(firstPage.items[0]?.recipientCount).toBe(1);
+      expect(firstPage.items[0]?.signature).toBeTruthy();
+      expect(firstPage.nextCursor).toBeTruthy();
+      const olderPage = reopened.solanaPayoutBatchPage(1, firstPage.nextCursor!);
+      expect(olderPage.items[0]?.recipientCount).toBe(4);
+      expect(olderPage.nextCursor).toBeNull();
       for (const wallet of holders) expect(reopened.getSolanaPayout(id, wallet)?.state).toBe("sent");
       reopened.close();
     } finally { rmSync(folder, { recursive: true, force: true }); }

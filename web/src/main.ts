@@ -29,6 +29,9 @@ type StatsSummary = { count: number; solBudgetLamports: string | null; totalUsd:
 type Purchase = { candidateId: string; chain: Chain; launchpad: string; token: string;
   name: string | null; symbol: string | null; imageUrl: string | null; purchaseTx: string;
   spendAtoms: string | null; budgetLamports: string | null; createdAt: number };
+type PayoutBatch = { id: number; token: string; signature: string; sentAt: number;
+  recipientCount: number; rewardDecimals: number;
+  recipients: Array<{ wallet: string; rewardAtoms: string }> };
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -55,6 +58,11 @@ let statsNextCursor: string | null = null;
 let statsPageLoaded = false;
 let statsBusy = false;
 let statsGeneration = 0;
+let statsView: "buys" | "payouts" = "buys";
+let payoutBatches: PayoutBatch[] = [];
+let payoutNextCursor: number | null = null;
+let payoutPageLoaded = false;
+let payoutBusy = false;
 type TokenMetadata = { name: string | null; symbol: string | null; imageUrl: string | null; expiresAt: number };
 const tokenMetadataCache = new Map<string, TokenMetadata>();
 const tokenMetadataQueue: Activity[] = [];
@@ -116,6 +124,11 @@ function userError(error: unknown, fallback: string): string {
 }
 
 function short(value: string): string { return value.length > 18 ? `${value.slice(0, 7)}…${value.slice(-6)}` : value; }
+function solscanTransaction(signature: string): string { return `https://solscan.io/tx/${encodeURIComponent(signature)}`; }
+function purchaseExplorer(chain: Chain, signature: string): string | null {
+  return chain === "sol" ? solscanTransaction(signature) :
+    chain === "bsc" ? `https://bscscan.com/tx/${encodeURIComponent(signature)}` : null;
+}
 function amount(raw: string, decimals: number): string {
   const base = 10n ** BigInt(decimals);
   const atoms = BigInt(raw);
@@ -179,7 +192,13 @@ function renderActivity(): void {
     context.textContent = `${launchpadName[item.launchpad] ?? item.launchpad} · ${networkLabel}`;
     middle.append(token, context);
     const result = document.createElement("div"); result.className = "activity-result";
-    const label = document.createElement("strong");
+    const explorer = item.purchaseTx && item.state === "settled" ? purchaseExplorer(item.chain, item.purchaseTx) : null;
+    const label = document.createElement(explorer ? "a" : "strong");
+    if (explorer) {
+      const link = label as HTMLAnchorElement;
+      link.href = explorer; link.target = "_blank"; link.rel = "noopener noreferrer";
+      link.setAttribute("aria-label", `View ${item.chain === "sol" ? "Solscan" : "BscScan"} purchase transaction`);
+    }
     const detail = document.createElement("small");
     const unit = item.chain === "sol" ? "SOL" : item.chain === "bsc" ? "BNB" : "ETH";
     label.textContent = `Buy ${item.spendAtoms && item.purchaseTx ? nativeSpend(item.spendAtoms, item.chain === "sol" ? 9 : 18) : "—"} ${unit}`;
@@ -255,7 +274,8 @@ function renderStatsSummary(): void {
   byId("stats-total-count").textContent = summary.count.toLocaleString("en-US");
   byId("stats-total-sol").textContent = solAllocated;
   byId("stats-total-usd").textContent = usdLabel(summary.totalUsd);
-  byId("stats-list-count").textContent = `${summary.count.toLocaleString("en-US")} ${summary.count === 1 ? "buy" : "buys"}`;
+  if (statsView === "buys")
+    byId("stats-list-count").textContent = `${summary.count.toLocaleString("en-US")} ${summary.count === 1 ? "buy" : "buys"}`;
   for (const [chain, prefix] of [["sol", "sol"], ["bsc", "bsc"], ["robinhood", "rh"]] as const) {
     const row = summary.chains[chain];
     byId(`stats-${prefix}-native`).textContent = `${nativeLabel(row.spendAtoms, chain)} ${row.nativeUnit}`;
@@ -282,6 +302,7 @@ async function loadStatsSummary(): Promise<void> {
 function renderStatsList(): void {
   const list = byId<HTMLDivElement>("stats-list");
   list.replaceChildren();
+  if (statsView === "payouts") { renderPayoutList(list); return; }
   if (!purchases.length) {
     if (!statsBusy && statsPageLoaded) {
       const empty = document.createElement("div"); empty.className = "stats-empty";
@@ -304,7 +325,13 @@ function renderStatsList(): void {
     context.textContent = `${launchpadName[item.launchpad] ?? item.launchpad} · ${nativeUnit(item.chain)} · ${new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
     token.append(title, context);
     const spend = document.createElement("div"); spend.className = "stats-spend";
-    const native = document.createElement("strong");
+    const explorer = purchaseExplorer(item.chain, item.purchaseTx);
+    const native = document.createElement(explorer ? "a" : "strong");
+    if (explorer) {
+      const link = native as HTMLAnchorElement;
+      link.href = explorer; link.target = "_blank"; link.rel = "noopener noreferrer";
+      link.setAttribute("aria-label", `View ${item.chain === "sol" ? "Solscan" : "BscScan"} purchase transaction`);
+    }
     native.textContent = `Buy ${nativeLabel(item.spendAtoms, item.chain)} ${nativeUnit(item.chain)}`;
     const usd = document.createElement("small");
     const price = statsSummary?.chains[item.chain].price;
@@ -314,6 +341,71 @@ function renderStatsList(): void {
     row.append(avatar, token, spend); fragment.append(row);
   }
   list.append(fragment);
+}
+
+function renderPayoutList(list: HTMLDivElement): void {
+  if (!payoutBatches.length) {
+    if (payoutPageLoaded && !payoutBusy) {
+      const empty = document.createElement("div"); empty.className = "stats-empty";
+      empty.textContent = "No holder transfers yet."; list.append(empty);
+    }
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const batch of payoutBatches) {
+    const row = document.createElement("div"); row.className = "payout-log";
+    const summary = document.createElement("div"); summary.className = "payout-log-summary";
+    const copy = document.createElement("div");
+    const title = document.createElement("strong"); title.textContent = `${batch.recipientCount} ${batch.recipientCount === 1 ? "holder" : "holders"} paid`;
+    const detail = document.createElement("small");
+    detail.textContent = `${new Date(batch.sentAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${short(batch.token)}`;
+    copy.append(title, detail);
+    const link = document.createElement("a"); link.href = solscanTransaction(batch.signature);
+    link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Solscan ↗";
+    link.setAttribute("aria-label", `View transfer transaction ${batch.signature} on Solscan`);
+    summary.append(copy, link);
+    const recipients = document.createElement("div"); recipients.className = "payout-recipients";
+    for (const holder of batch.recipients) {
+      const recipient = document.createElement("span");
+      recipient.textContent = `${short(holder.wallet)} · ${amount(holder.rewardAtoms, batch.rewardDecimals)}`;
+      recipient.title = holder.wallet;
+      recipients.append(recipient);
+    }
+    row.append(summary, recipients); fragment.append(row);
+  }
+  list.append(fragment);
+}
+
+async function loadPayoutPage(): Promise<void> {
+  if (payoutBusy || (payoutPageLoaded && !payoutNextCursor)) return;
+  const generation = statsGeneration;
+  payoutBusy = true;
+  const state = byId<HTMLDivElement>("stats-load-state");
+  state.textContent = "Loading transfers…";
+  try {
+    const query = payoutNextCursor ? `?cursor=${payoutNextCursor}` : "";
+    const response = await fetch(`/api/stats/payouts${query}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Transfers unavailable");
+    const page = await response.json() as { items: PayoutBatch[]; nextCursor: number | null };
+    if (generation !== statsGeneration) return;
+    payoutBatches.push(...page.items);
+    payoutNextCursor = page.nextCursor;
+    payoutPageLoaded = true; payoutBusy = false;
+    if (statsView === "payouts") {
+      byId("stats-list-count").textContent = `${payoutBatches.length}${payoutNextCursor ? "+" : ""} transfers`;
+      renderStatsList();
+      state.textContent = payoutNextCursor ? "Scroll for more" : "";
+    }
+  } catch {
+    if (generation !== statsGeneration) return;
+    payoutBusy = false;
+    if (statsView === "payouts") {
+      state.replaceChildren();
+      const retry = document.createElement("button"); retry.type = "button";
+      retry.className = "stats-retry"; retry.textContent = "Could not load. Retry";
+      retry.addEventListener("click", () => { void loadPayoutPage(); }); state.append(retry);
+    }
+  }
 }
 
 async function hydratePurchaseMetadata(rows: Purchase[]): Promise<void> {
@@ -344,17 +436,21 @@ async function loadStatsPage(): Promise<void> {
     statsNextCursor = page.nextCursor;
     statsPageLoaded = true;
     statsBusy = false;
-    renderStatsList();
-    state.textContent = statsNextCursor ? "Scroll for more" : "";
+    if (statsView === "buys") {
+      renderStatsList();
+      state.textContent = statsNextCursor ? "Scroll for more" : "";
+    }
     void hydratePurchaseMetadata(page.items);
   } catch {
     if (generation !== statsGeneration) return;
     statsBusy = false;
-    state.replaceChildren();
-    const retry = document.createElement("button"); retry.type = "button";
-    retry.className = "stats-retry"; retry.textContent = "Could not load. Retry";
-    retry.addEventListener("click", () => { void loadStatsPage(); });
-    state.append(retry);
+    if (statsView === "buys") {
+      state.replaceChildren();
+      const retry = document.createElement("button"); retry.type = "button";
+      retry.className = "stats-retry"; retry.textContent = "Could not load. Retry";
+      retry.addEventListener("click", () => { void loadStatsPage(); });
+      state.append(retry);
+    }
   }
 }
 
@@ -693,15 +789,35 @@ thesisModal.addEventListener("click", (event) => {
 });
 const statsModal = byId<HTMLDialogElement>("stats-modal");
 const statsScroll = byId<HTMLDivElement>("stats-scroll");
+function selectStatsView(view: "buys" | "payouts"): void {
+  statsView = view;
+  statsScroll.scrollTop = 0;
+  statsScroll.setAttribute("aria-label", view === "buys" ? "Bought tokens list" : "Holder transfer log");
+  byId("stats-buys-tab").setAttribute("aria-selected", String(view === "buys"));
+  byId("stats-payouts-tab").setAttribute("aria-selected", String(view === "payouts"));
+  byId("stats-list-count").textContent = view === "buys"
+    ? `${(statsSummary?.count ?? 0).toLocaleString("en-US")} ${statsSummary?.count === 1 ? "buy" : "buys"}`
+    : `${payoutBatches.length}${payoutNextCursor ? "+" : ""} transfers`;
+  byId("stats-load-state").textContent = "";
+  renderStatsList();
+  if (view === "buys") void loadStatsPage();
+  else void loadPayoutPage();
+}
+byId<HTMLButtonElement>("stats-buys-tab").addEventListener("click", () => selectStatsView("buys"));
+byId<HTMLButtonElement>("stats-payouts-tab").addEventListener("click", () => selectStatsView("payouts"));
 byId<HTMLButtonElement>("open-stats").addEventListener("click", () => {
   statsGeneration++;
   purchases = [];
   statsNextCursor = null;
   statsPageLoaded = false;
   statsBusy = false;
+  payoutBatches = [];
+  payoutNextCursor = null;
+  payoutPageLoaded = false;
+  payoutBusy = false;
   statsScroll.scrollTop = 0;
   byId("stats-load-state").replaceChildren();
-  renderStatsList();
+  selectStatsView("buys");
   statsModal.showModal();
   void loadStatsSummary();
   void loadStatsPage();
@@ -714,12 +830,13 @@ statsModal.addEventListener("click", (event) => {
       event.clientY < rect.top || event.clientY > rect.bottom) statsModal.close();
 });
 const statsObserver = new IntersectionObserver((entries) => {
-  if (statsModal.open && entries.some((entry) => entry.isIntersecting)) void loadStatsPage();
+  if (statsModal.open && entries.some((entry) => entry.isIntersecting))
+    void (statsView === "buys" ? loadStatsPage() : loadPayoutPage());
 }, { root: statsScroll, rootMargin: "120px" });
 statsObserver.observe(byId("stats-sentinel"));
 statsScroll.addEventListener("scroll", () => {
   if (statsScroll.scrollTop + statsScroll.clientHeight >= statsScroll.scrollHeight - 120)
-    void loadStatsPage();
+    void (statsView === "buys" ? loadStatsPage() : loadPayoutPage());
 });
 document.querySelectorAll<HTMLButtonElement>(".chain-filters button[data-chain]").forEach((button) => {
   button.addEventListener("click", () => {

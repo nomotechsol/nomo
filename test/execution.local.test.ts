@@ -45,6 +45,23 @@ class LocalAdapter implements ExecutionAdapter {
 }
 
 describe("local purchase cycle", () => {
+  it("never buys the project's own Solana mint", async () => {
+    const store = new Store(":memory:");
+    store.setFilters({ ...disabledFilters, pumpfun: { enabled: true, minTotalFeesNative: 1 } });
+    const now = Date.now();
+    store.addCandidate({ chain: "sol", launchpad: "pumpfun", token: "project-mint", pool: "project-pool",
+      graduationTx: "project-graduation", graduatedAt: now - 1000, totalFeesNative: 2,
+      isMayhemMode: false, quoteMint: "quote" });
+    const adapter = new LocalAdapter();
+    const engine = new ExecutionEngine(store, adapter,
+      { activatedAt: now - 2000, excludedSolanaMint: "project-mint" });
+    const row = store.listCandidates()[0]!;
+    store.updateCandidate(row.id, "eligible", []);
+    expect(await engine.tick(now)).toBeUndefined();
+    expect(adapter.spends).toEqual([]);
+    expect(store.getJob(row.id)).toBeUndefined();
+    store.close();
+  });
   it("rejects low-fee bonded tokens, buys sequentially with 25% current balance and resumes publication", async () => {
     const store = new Store(":memory:");
     const filters: FilterSet = { ...disabledFilters, flap_tax: { enabled: true, minTotalFeesNative: 0.15 },

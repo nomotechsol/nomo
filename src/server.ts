@@ -134,6 +134,11 @@ function classify(): void {
   const filters = store.getFilters();
   for (const row of store.listCandidates(10_000)) {
     if (row.state === "reserved" || row.state === "settled") continue;
+    if (row.candidate.chain === "sol" && row.candidate.token === process.env.MAIN_TOKEN_MINT) {
+      if (row.state !== "rejected" || row.reasons[0] !== "project_mint")
+        store.updateCandidate(row.id, "rejected", ["project_mint"]);
+      continue;
+    }
     const rule = filters[row.candidate.launchpad];
     const reasons = evaluateCandidate(row.candidate, rule, Date.now());
     const missing = missingCandidateData(row.candidate, rule);
@@ -262,6 +267,13 @@ app.get<{ Querystring: { cursor?: string } }>("/api/stats/purchases", async (req
       return { ...item, imageUrl: tokenImages.publicUrl(item.imageUrl) };
     }) };
   }
+  catch { return reply.code(400).send({ error: "invalid_cursor" }); }
+});
+app.get<{ Querystring: { cursor?: string } }>("/api/stats/payouts", async (request, reply) => {
+  reply.header("cache-control", "no-store");
+  const parsed = z.object({ cursor: z.string().regex(/^[1-9]\d*$/).optional() }).safeParse(request.query);
+  if (!parsed.success) return reply.code(400).send({ error: "invalid_cursor" });
+  try { return store.solanaPayoutBatchPage(10, parsed.data.cursor === undefined ? undefined : Number(parsed.data.cursor)); }
   catch { return reply.code(400).send({ error: "invalid_cursor" }); }
 });
 app.get<{ Params: { file: string } }>("/token-images/:file", async (request, reply) => {
@@ -468,7 +480,7 @@ try {
     } : solanaAdapter;
     execution = new ExecutionEngine(store, adapter,
       { activatedAt: Date.now(), chains: ["sol", ...(bscAdapter ? ["bsc" as const] : []),
-        ...(rhAdapter ? ["robinhood" as const] : [])] });
+        ...(rhAdapter ? ["robinhood" as const] : [])], excludedSolanaMint: process.env.MAIN_TOKEN_MINT });
   }
   classify();
   await app.listen({ host: "127.0.0.1", port: Number(process.env.PORT ?? 8789) });
